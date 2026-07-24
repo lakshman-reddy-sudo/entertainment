@@ -1,0 +1,147 @@
+Starting test...
+[DesiFlix] Request: tmdbId=tt0816692 type=movie s=null e=null
+[DahmerMovies] Initializing Scraper
+[Hashhackers] getStreams: tt0816692 | Type: movie
+[DahmerMovies] Initializing Scraper
+[NoTorrent] Searching for movie tt0816692
+[Vidrock] Starting extraction for TMDB ID: tt0816692, Type: movie
+[GoatAPI] getStreams → id=tt0816692 type=movie
+[🔵 HindMovie] request: id=tt0816692 type=movie s=null e=null
+[VidFast] Fetching streams for movie tt0816692
+[VidFast] Loading page: https://vidfast.vc/movie/tt0816692/
+[MovieBlast] Fetching streams for TMDB ID: tt0816692, Type: movie
+[Vidlink] Fetching streams for movie tt0816692
+[MoviesHunt] getStreams(tt0816692, movie, null, null)
+[AnimeSalt] Start: tt0816692 movie SnullEnull
+[VidEasy] Starting extraction for TMDB ID: tt0816692, Type: movie
+[VidSrc.me] Fetching embed page: https://vidsrc.me/embed/tt0816692
+[Castle] Starting extraction for TMDB ID: tt0816692, Type: movie
+[Animetsu] Request: ID=tt0816692 Type=movie S=null E=null
+KissKH getStreams called: tt0816692 movie
+Fetching TMDB: https://api.themoviedb.org/3/movie/tt0816692?api_key=1865f43a0549ca50d341dd9ab8b29f49
+[DooFlix] Fetching streams for TMDB ID: tt0816692, Type: movie
+[Xpass] Fetching streams for movie tt0816692
+[Xpass] Navigating to Embed: https://play.xpass.top/e/movie/tt0816692
+[AnimeKai][rid:x4y715z73wrq] getStreams start { id: 'tt0816692', S: null, E: null }
+[Cineby] Fetching movie tmdb:tt0816692
+[CineMM] Request: ID=tt0816692, Type=movie, S=null, E=null
+[CineMM] Mobile ID detected (tt0816692). Resolving via TMDB...
+[MoviesDrive] request: id=tt0816692 type=movie s=null e=null
+[CineFreak] Request: tmdbId=tt0816692 type=movie S=null E=null
+[UHDMovies] getStreams movie tt0816692
+[UHDMovies] TMDB: https://api.themoviedb.org/3/movie/tt0816692?api_key=1865f43a0549ca50d341dd9ab8b29f49
+[Peachify] ID=tt0816692 T=movie S=null E=null
+[Peachify] Resolving IMDb ID...
+[Anime-Sama] Request: Anime-Sama movie tt0816692 SnullEnull
+Anilist ID: null
+[Animetsu] Domains updated: BASE_URL=https://animetsu.live/v2/api
+[Xpass] Found 25 servers.
+[Xpass] Fetching JSON from backup server: https://play.xpass.top/mdata/PtVTD918r3r38TPt5twgAZ/1/playlist.json
+[DooFlix] API error: 401
+[AnimeKai][rid:x4y715z73wrq] ArmSync: Resolving for date 2014-11-07 (Show: undefined, DayIndex: 1)
+[Xpass] Parsing master m3u8: https://tik.1x2.space/playlist/eCRDQtzE_SeRioAu9BvFXjngooM1oCaEtYuEjH84UtMCrNEl--Blcm0QCKOh4v2bmQuOqJURThVamkJFhrkxbM1aHFA/master.m3u8
+[VidFast] Incomplete decryption config
+[Xpass] Parsing master m3u8: https://sq3.novacrestnetwork.online/v4/vz/6mx13s/cf-master.1762590947.txt?t=79cfec5cb32459ff550fa65b&e=1765241578
+[AnimeKai][rid:x4y715z73wrq] ArmSync: Found 20 AniList candidates via search
+[AnimeKai][rid:x4y715z73wrq] ArmSync: Match found AniList ID 21 (ONE PIECE)
+[AnimeKai][rid:x4y715z73wrq] using verified result { alId: 21, episode: 1, title: 'Interstellar', dayIndex: 1 }
+[Xpass] Fetching JSON from backup server: https://play.xpass.top/vip/eHgXSoWV_nOR04959hvFVm3jooI59CaE5ImD3nc_U9YNrY9x--Blcm0QCKOh4v2bmQuOqAcXpnbuRCqaKEkI9jUTiDM/1/playlist.json
+[Xpass] Parsing master m3u8: https://vip.1x2.space/playlist/eHgXSoWV_nOR04959hvFVm3jooI59CaE5ImD3nc_U9YNrY9x--Blcm0QCKOh4v2bmQuOqAcXpnbuRCqaKEkI9jUTiDM/master.m3u8
+[AnimeKai][rid:x4y715z73wrq] Database: Numeric match success #1
+[AnimeKai][rid:x4y715z73wrq] runStreamFetch: start token=coDh9_Ly6U6v1W8Visvd
+[CineFreak] TMDB info not found for tt0816692
+[AnimeKai][rid:x4y715z73wrq] links/list: enc(token) ready
+[Xpass] Fetching JSON from backup server: https://play.xpass.top/mdata/2NgBHsJR1LasgLHXy5pP2Y/0/playlist.json
+[Xpass] Parsing master m3u8: https://tik.1x2.space/playlist/Kn9HHYHGrHSRjo569xvFDzHhots19SOE493f3n06VoEFqdEq--Blcm0QCKOh4v2bmQuOqLGpuLaQJEsHJkeGf1aUIi8/master.m3u8
+[Xpass] Fetching JSON from backup server: https://play.xpass.top/mdata/AiEmXjYv4MnBHWv4GaS4Sx/1/playlist.json
+[Xpass] Parsing master m3u8: https://tik.1x2.space/playlist/LngXT9eR-iyR2I55oxvFXzniooI3oHaE4o6E338_Vo5TqYwm--Blcm0QCKOh4v2bmQuOqCwls5ZNOPhBkNi_-jv01fs/master.m3u8
+[Xpass] Fetching JSON from backup server: https://play.xpass.top/mdata/Mp5AEcFsZcE4a8ThbXZSJH/2/playlist.json
+[Xpass] Parsing master m3u8: https://tik.1x2.space/playlist/eyVOQtCS-iyR34Eo_hvFX2nvothlpXWE5d3S3no7AoQF8NF2--Blcm0QCKOh4v2bmQuOqPlL3Q4UYZCC77RAKEJDE7c/master.m3u8
+[Xpass] Fetching JSON from backup server: https://play.xpass.top/mdata/X21p9RYbntiUS2eXnv3x6B/0/playlist.json
+[VidSrc.me] Scraper error: This operation was aborted
+[Xpass] Parsing master m3u8: https://suprox.xpass.top/proxy2/DD77Cwyndc6OG_L0FSTCFr7lTnZUJsPjRQExwpUotcdvtB2xZVIiWg/2/master.m3u8
+Finished in 9534ms
+{
+  statusCode: 200,
+  headers: {
+    'x-powered-by': 'Express',
+    'access-control-allow-origin': '*',
+    'content-type': 'application/json; charset=utf-8'
+  },
+  isBase64Encoded: false,
+  body: '{"streams":[]}'
+}
+[Xpass] Fetching JSON from backup server: https://play.xpass.top/mdata/K6STq3RHd7RrDFxVAs9T8V/1/playlist.json
+[🔵 HindMovie] resolved: "tt0816692" (?)
+[🔵 HindMovie] Searching WP-JSON by Title: tt0816692
+[MoviesDrive] resolved: "tt0816692" (?)
+[Peachify] Timeout: https://api.themoviedb.org/3/find/tt0816692?api_key=439c478a771f35c05022f9feabcc
+[Peachify] Iron: https://uwu.eat-peach.sbs/moviebox/movie/tt0816692
+[Peachify] Wolf: https://usa.eat-peach.sbs/air/movie/tt0816692
+[Peachify] Spider: https://usa.eat-peach.sbs/holly/movie/tt0816692
+[Peachify] Multi: https://usa.eat-peach.sbs/multi/movie/tt0816692
+[Peachify] Dark: https://uwu.eat-peach.sbs/net/movie/tt0816692
+[Xpass] Parsing master m3u8: https://suprox.xpass.top/proxy2/rLr_b411P8qnEoaxWAXQEtUWffudlOb4DyOfzNQVFAeocsA2qNxsjQ/2/master.m3u8
+Search title: Anime
+[DesiFlix] Fetching streams from: https://desiflix.stremioaddon.workers.dev/stream/movie/tt0816692.json
+[OnlyKDrama] fetch failed
+[CineMM] Resolved: "tt0816692" (N/A)
+fetchSafe Error: fetch failed
+TMDB fetch failed or returned null!
+[VidEasy] Media Details: "Unknown Movie" (N/A) | Duration: 90 min
+[VidEasy] Fetching seed from: https://api.wingsdatabase.com/seed?mediaId=tt0816692
+[MoviesHunt] TMDB fetch failed
+[🟡 PlayIMDb] Fetching stream data from API: https://streamdata.vaplayer.ru/api.php?tmdb=tt0816692&type=movie
+[UHDMovies] No search results
+[Peachify] Spider -> 422
+[Peachify] Multi -> 422
+[Peachify] Wolf -> 422
+[Xpass] Fetching JSON from backup server: https://play.xpass.top/feb/157336/0/0/0/playlist.json
+[Vidlink] Fetching playlist from: https://vidlink.pro/api/b/movie/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAxGBp00b3hzBGxvAYQRyi9ITHCMZ8dmAg68RKiKZStBDy
+[Xpass] Parsing master m3u8: https://hls.shegu.net/1809529.m3u8?KEY7=web_player&KEY8=398562&client=febbox&quality=360p&sign=0ba97dc516686d76e5e8cce0d17bce678efcc51aF01&t=1783601449
+Sub results: 40, Dub results: 23
+[Sub] Got 0 raw sources
+[Dub] Got 0 raw sources
+[Xpass] Fetching JSON from backup server: https://play.xpass.top/mdata/WFTzLwck7c7KLEe17phH18/0/playlist.json
+[MoviesDrive] search found 1 for: tt0816692
+[MoviesDrive] no match
+[DesiFlix] Returning 4 sorted streams
+[Vidlink] No playlist in response
+[🔵 HindMovie] No strict match found in WP-JSON
+[Xpass] Parsing master m3u8: https://cflul.bx9.workers.dev/vid/UIMOwSfC0U-cMYIowTLZ5n2DEof6drecLQlKjKt3Qg30jnxkBYVqkg
+[AnimeKai][rid:x4y715z73wrq] links/list failed fetch failed
+[AnimeKai][rid:x4y715z73wrq] ERROR: fetch failed
+[Xpass] Fetching JSON from backup server: https://play.xpass.top/mdata/26hbdwp9xuNvxx5EXeXDgK/1/playlist.json
+[Peachify] Timeout: https://api.themoviedb.org/3/movie/tt0816692?api_key=439c478a771f35c05022f9feabc
+[Xpass] Parsing master m3u8: https://cflul.bx9.workers.dev/vid/2gJIS3ooYDwq0rzV8tqCKgHv1wW_CPgbjtLyzf56usShazNvCd9uKQ
+[Xpass] Fetching JSON from backup server: https://play.xpass.top/mdata/T7MqgagqfacT8CTjsSJYgw/2/playlist.json
+[Xpass] Parsing master m3u8: https://cflul.bx9.workers.dev/vid/s34C4wefGGQCJoqRFxu8-1yU6Sgxt9Rb35gA_J5gdrWkcfSw3sY2rQ
+[VixSrc] Fetching API: https://unitv.mom/api/movie/tt0816692
+[VixSrc] Fetching embed: https://unitv.mom/embed/273588?token=f9ad96ddb818a32256ee933b01d49ad7&t=SW50ZXJzdGVsbGFy&expires=1784913020&lang=en&skin=vixsrc&canPlayFHD=1
+[Xpass] Fetching JSON from backup server: https://play.xpass.top/mdata/D2Jbda6AnP6uiGF6sGwqvt/0/playlist.json
+[VixSrc] Final stream URL: https://unitv.mom/playlist/273588.m3u8?b=1&token=65c29dd9dc77372087ed75198003e8e5&expires=1790097011&h=1&lang=it
+[Xpass] Fetching JSON from backup server: https://play.xpass.top/mdata/V7UD2yyKqsjYb61pmz6rn/1/playlist.json
+[Xpass] Fetching JSON from backup server: https://play.xpass.top/mvid/PtVTD918r3r38TPt5twgAZ/1/playlist.json
+[Xpass] Parsing master m3u8: https://sq3.novacrestnetwork.online/v4/vz/6mx13s/cf-master.1762590947.txt?t=79cfec5cb32459ff550fa65b&e=1765241578
+[Xpass] Fetching JSON from backup server: https://play.xpass.top/mdata/2dadAZZy3D4WAERESxKLiB/0/playlist.json
+[Xpass] Parsing master m3u8: https://mol.1x2.space/playlist/byUfTNSRo2LT2I4ru0rBWzr4uoMvonKZ-orS3lwubLFbcm-KmjLiIYlw4-Y
+[Peachify] Timeout: https://uwu.eat-peach.sbs/moviebox/movie/tt0816692
+[Peachify] Iron -> no response
+[Peachify] Timeout: https://uwu.eat-peach.sbs/net/movie/tt0816692
+[Peachify] Dark -> no response
+[Peachify] Total: 0 streams
+[Xpass] Fetching JSON from backup server: https://play.xpass.top/mdata/7zBYdPycj2acBopgKdqP5Z/1/playlist.json
+[Xpass] Parsing master m3u8: https://mol.1x2.space/playlist/dHIcSdCHsiTYgo9qu0rBWzr4uoMvonKZ-orS3u1RSA9J7C7xdXeorK4JxLc
+[Xpass] Fetching JSON from backup server: https://play.xpass.top/mdata/HfjaHUFSuSXYdo9pLW7Li/0/playlist.json
+[Xpass] Fetching JSON from backup server: https://play.xpass.top/mdata/94kibxvhA9Mq9EAJttVHHk/1/playlist.json
+[Xpass] Fetching JSON from backup server: https://play.xpass.top/mdata/AQghWE3dUcCkmhzJdfkQJZ/2/playlist.json
+[Xpass] Fetching JSON from backup server: https://play.xpass.top/mdata/VjpfpSD1i2HJ1rNmJK2VPi/0/playlist.json
+[Xpass] Fetching JSON from backup server: https://play.xpass.top/mdata/NjsCVn9dNrenLJ6to8yuT7/1/playlist.json
+[Xpass] Fetching JSON from backup server: https://play.xpass.top/mdata/VAZX4ruz64FBwkYeo1axdW/0/playlist.json
+[Xpass] Fetching JSON from backup server: https://play.xpass.top/meg/movie/157336/1/playlist.json
+[Metadata] Titles for tt0816692: 
+[Xpass] Parsing master m3u8: https://ps1.1x2.space/enproxy/cmkCC5fK5zramdZvs1WfA22iupRx4i2GstKLjH1xDttxttBHzN8zCx4PT6_1nIHi9g2O3iEx3Rj6jbFzJSdy8fjMmaToe9a4MijCPR51Ql6FMrrl9nKQtxsdcFfbgAw9auxAlqYeosrxWQp32xE0b1SJgn2wNfPYyaYYswMqkDqHZKAUgOVoOs5msLENZ-H3yfcJdCl4l0TWzEoNlOJHFens7NSgJxtiQwwCbRhkQXrG28G8_C9okP-HcYwdv03C3SXHJWUwl10FODU53Pp1YsnLA-zg4l05renAtU7-wk2StcGfV9HhoTxPl6muCOpStPqo7ACM_50NMuPExaN_o7IWVs0/master.m3u8
+[Xpass] Fetching JSON from backup server: https://play.xpass.top/vxr/movie/157336/playlist.json
+[Xpass] Fetching JSON from backup server: https://play.xpass.top/vrk/movie/157336/playlist.json
+[Xpass] Parsing master m3u8: https://hlsproxy3.asiaflix.net/m3u8-proxy?url=https%3A%2F%2Fqueenselti.me%2Fmeoadng%2Fuwu.m3u8&headers=%7B%22Origin%22%3A%22https%3A%2F%2Fvidrock.net%22%7D
+[Xpass] Returning 26 parsed streams.
