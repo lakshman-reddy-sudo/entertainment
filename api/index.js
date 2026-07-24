@@ -22,8 +22,9 @@ const TMDB_API_KEY = "e8f0855cbadb760c109f061e72be897a"; // Change this if scrap
 // Intercept TMDB API requests and inject our API key
 const originalFetch = global.fetch;
 global.fetch = async (url, options) => {
-    if (typeof url === "string" && url.includes("api.themoviedb.org") && url.includes("api_key=")) {
+    if (typeof url === "string" && (url.includes("api.themoviedb.org") || url.includes("api.tmdb.org")) && url.includes("api_key=")) {
         url = url.replace(/api_key=[^&]+/, "api_key=" + TMDB_API_KEY);
+        url = url.replace("api.themoviedb.org", "api.tmdb.org");
     }
     return originalFetch(url, options);
 };
