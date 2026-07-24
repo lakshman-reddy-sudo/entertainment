@@ -92,7 +92,7 @@ addon.defineStreamHandler(async (args) => {
                         console.error(`Error running Nuvio scraper ${scraperInfo.name}:`, err.message);
                         return [];
                     }),
-                    new Promise((_, reject) => setTimeout(() => reject(new Error('Scraper timeout')), process.env.VERCEL || process.env.RENDER ? 55000 : 9200))
+                    new Promise((_, reject) => setTimeout(() => reject(new Error('Scraper timeout')), process.env.VERCEL || process.env.RENDER ? 18000 : 9200))
                 ]);
                 
                 if (results && Array.isArray(results)) {
