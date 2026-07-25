@@ -135,7 +135,145 @@ addon.defineStreamHandler(async (args) => {
     return { streams: allStreams };
 });
 
+async function runUniversalExtraction(baseId, type = "movie", season = null, episode = null) {
+    const stType = type === "series" || type === "tv" ? "tv" : type;
+    const startTime = Date.now();
+    
+    if (!cachedManifest) {
+        const manifestRes = await axios.get(`${NUVIO_RAW_BASE}/manifest.json`);
+        cachedManifest = manifestRes.data;
+    }
+
+    const tasks = [];
+    cachedManifest.scrapers.forEach(scraperInfo => {
+        if (!scraperInfo.enabled) return;
+        if (!scraperInfo.supportedTypes.includes(stType)) return;
+
+        tasks.push(async () => {
+            const scraperModule = await loadNuvioScraper(scraperInfo.filename);
+            if (!scraperModule || typeof scraperModule.getStreams !== "function") return [];
+
+            try {
+                const results = await Promise.race([
+                    scraperModule.getStreams(baseId, stType, season, episode).catch(err => {
+                        console.error(`[Extractor] Error in ${scraperInfo.name}:`, err.message);
+                        return [];
+                    }),
+                    new Promise((_, reject) => setTimeout(() => reject(new Error('Scraper timeout')), 45000))
+                ]);
+                return { provider: scraperInfo.name, results: Array.isArray(results) ? results : [] };
+            } catch (err) {
+                console.error(`[Extractor] Timeout/Error in ${scraperInfo.name}:`, err.message);
+                return { provider: scraperInfo.name, results: [] };
+            }
+        });
+    });
+
+    const executing = [];
+    const poolResults = [];
+    for (const task of tasks) {
+        const p = Promise.resolve().then(() => task());
+        poolResults.push(p);
+        if (6 <= tasks.length) {
+            const e = p.then(() => executing.splice(executing.indexOf(e), 1));
+            executing.push(e);
+            if (executing.length >= 6) {
+                await Promise.race(executing);
+            }
+        }
+    }
+
+    const settled = await Promise.allSettled(poolResults);
+    
+    const extractedLinks = [];
+    const providerStats = {};
+
+    settled.forEach(res => {
+        if (res.status === "fulfilled" && res.value && res.value.results) {
+            const { provider, results } = res.value;
+            providerStats[provider] = results.length;
+            
+            results.forEach(stream => {
+                let proxyUrl = stream.url;
+                const isM3U8 = proxyUrl.includes(".m3u8");
+                const hasHeaders = stream.headers && Object.keys(stream.headers).length > 0;
+                if (isM3U8 || hasHeaders) {
+                    const headerParams = hasHeaders ? `&${new URLSearchParams(stream.headers).toString()}` : "";
+                    proxyUrl = `${HLS_PROXY_URL}/?url=${encodeURIComponent(stream.url)}${headerParams}`;
+                }
+
+                extractedLinks.push({
+                    provider: provider,
+                    quality: stream.quality || "Auto",
+                    title: stream.title || "Stream",
+                    directUrl: stream.url,
+                    proxyUrl: proxyUrl,
+                    headers: stream.headers || {},
+                    behaviorHints: stream.behaviorHints || {}
+                });
+            });
+        }
+    });
+
+    return {
+        status: "success",
+        query: { id: baseId, type: stType, season: season, episode: episode },
+        timeTakenMs: Date.now() - startTime,
+        totalLinks: extractedLinks.length,
+        activeProviders: Object.keys(providerStats).filter(p => providerStats[p] > 0).length,
+        providerStats: providerStats,
+        links: extractedLinks
+    };
+}
+
 const app = express();
+
+app.get("/api/extract", async (req, res) => {
+    try {
+        let id = req.query.id || req.query.imdbId;
+        if (!id) return res.status(400).json({ status: "error", message: "Missing 'id' query parameter (e.g. ?id=tt0816692)" });
+
+        let type = req.query.type || "movie";
+        let season = req.query.season ? parseInt(req.query.season) : null;
+        let episode = req.query.episode ? parseInt(req.query.episode) : null;
+
+        if (id.includes(":")) {
+            const parts = id.split(":");
+            id = parts[0];
+            type = "series";
+            if (parts.length > 1) season = parseInt(parts[1]);
+            if (parts.length > 2) episode = parseInt(parts[2]);
+        }
+
+        const data = await runUniversalExtraction(id, type, season, episode);
+        res.setHeader("Access-Control-Allow-Origin", "*");
+        res.setHeader("Content-Type", "application/json");
+        return res.status(200).json(data);
+    } catch (err) {
+        return res.status(500).json({ status: "error", message: err.message });
+    }
+});
+
+app.get("/extract/movie/:id", async (req, res) => {
+    try {
+        const data = await runUniversalExtraction(req.params.id, "movie", null, null);
+        res.setHeader("Access-Control-Allow-Origin", "*");
+        return res.status(200).json(data);
+    } catch (err) {
+        return res.status(500).json({ status: "error", message: err.message });
+    }
+});
+
+app.get("/extract/series/:id/:season/:episode", async (req, res) => {
+    try {
+        const data = await runUniversalExtraction(req.params.id, "series", parseInt(req.params.season), parseInt(req.params.episode));
+        res.setHeader("Access-Control-Allow-Origin", "*");
+        return res.status(200).json(data);
+    } catch (err) {
+        return res.status(500).json({ status: "error", message: err.message });
+    }
+});
+
 app.use("/", getRouter(addon.getInterface()));
 
 module.exports = app;
