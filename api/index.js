@@ -12,30 +12,84 @@ global.CryptoJS = require("crypto-js");
 global.axios = axios;
 
 // Fix for Node 18+ fetch timeouts (UND_ERR_CONNECT_TIMEOUT) on Netlify IPv6
-dns.setDefaultResultOrder("ipv4first");
+try {
+    dns.setDefaultResultOrder("ipv4first");
+} catch (e) {
+    // ignore if unsupported
+}
 
-// === UPDATE THESE VARIABLES ONCE DEPLOYED ===
-const HLS_PROXY_URL = "https://nuvio-cf-proxy.lakshman-n-hlc0596.workers.dev"; // e.g. https://nuvio-proxy.username.workers.dev
-const TMDB_API_KEY = "e8f0855cbadb760c109f061e72be897a"; // Change this if scrapers need it
-// ============================================
+// === CONFIGURATION ===
+const HLS_PROXY_URL = "https://nuvio-cf-proxy.lakshman-n-hlc0596.workers.dev";
+const TMDB_API_KEY = "e8f0855cbadb760c109f061e72be897a";
+const NUVIO_RAW_BASE = "https://raw.githubusercontent.com/NuvioPlugin/All-in-One-Nuvio/main";
+// =====================
 
-// Intercept TMDB API requests and inject our API key
+// --- TMDB ID RESOLUTION & API KEY INTERCEPTOR ---
+const tmdbIdCache = {};
+
+async function resolveTmdbId(imdbId) {
+    if (!imdbId || !imdbId.startsWith("tt")) return imdbId;
+    if (tmdbIdCache[imdbId]) return tmdbIdCache[imdbId];
+    try {
+        const findUrl = `https://api.tmdb.org/3/find/${imdbId}?api_key=${TMDB_API_KEY}&external_source=imdb_id`;
+        const res = await originalFetch(findUrl);
+        if (res.ok) {
+            const data = await res.json();
+            let numericId = null;
+            if (data.tv_results && data.tv_results.length > 0) numericId = data.tv_results[0].id;
+            else if (data.movie_results && data.movie_results.length > 0) numericId = data.movie_results[0].id;
+            if (numericId) {
+                tmdbIdCache[imdbId] = numericId;
+                return numericId;
+            }
+        }
+    } catch (e) {
+        // ignore resolution error
+    }
+    return imdbId;
+}
+
+async function processUrlForTmdb(url) {
+    if (typeof url !== "string" || (!url.includes("themoviedb.org") && !url.includes("tmdb.org"))) {
+        return url;
+    }
+    url = url.replace("api.themoviedb.org", "api.tmdb.org");
+    if (url.includes("api_key=")) {
+        url = url.replace(/api_key=[^&]+/, "api_key=" + TMDB_API_KEY);
+    } else {
+        const separator = url.includes("?") ? "&" : "?";
+        url = `${url}${separator}api_key=${TMDB_API_KEY}`;
+    }
+    // Automatically resolve IMDb ID (tt...) to TMDB Numeric ID for TV and Movies
+    const match = url.match(/\/3\/(?:tv|movie|tv\/seasons|tv\/episodes)\/(tt\d+)/);
+    if (match && match[1]) {
+        const numericId = await resolveTmdbId(match[1]);
+        if (numericId && numericId !== match[1]) {
+            url = url.replace(match[1], numericId);
+        }
+    }
+    return url;
+}
+
 const originalFetch = global.fetch;
 global.fetch = async (url, options) => {
-    if (typeof url === "string" && (url.includes("api.themoviedb.org") || url.includes("api.tmdb.org")) && url.includes("api_key=")) {
-        url = url.replace(/api_key=[^&]+/, "api_key=" + TMDB_API_KEY);
-        url = url.replace("api.themoviedb.org", "api.tmdb.org");
-    }
+    url = await processUrlForTmdb(url);
     return originalFetch(url, options);
 };
 
-const NUVIO_RAW_BASE = "https://raw.githubusercontent.com/D3adlyRocket/All-in-One-Nuvio/main";
+axios.interceptors.request.use(async (config) => {
+    if (config.url) {
+        config.url = await processUrlForTmdb(config.url);
+    }
+    return config;
+});
+// ------------------------------------------------
 
 const addon = new addonBuilder({
     id: "org.nuvio.ultimate.port",
     version: "2.0.0",
     name: "All-in-One Nuvio Port",
-    description: "Runs all Nuvio Scrapers directly inside Stremio",
+    description: "Runs all Nuvio Scrapers directly inside Stremio and Standalone JSON API",
     resources: ["stream"],
     types: ["movie", "series", "anime"],
     idPrefixes: ["tt"],
@@ -52,8 +106,22 @@ async function loadNuvioScraper(filename) {
         let code = fs.readFileSync(scraperPath, "utf8");
 
         const m = { exports: {} };
+        const customRequire = (mod) => {
+            if (mod === "cheerio-without-node-native") {
+                try { return require("cheerio-without-node-native"); } catch(e) { return require("cheerio"); }
+            }
+            if (mod === "cheerio") return require("cheerio");
+            if (mod === "crypto-js") return require("crypto-js");
+            if (mod === "axios") return require("axios");
+            try {
+                return require(mod);
+            } catch (err) {
+                if (mod.includes("cheerio")) return require("cheerio");
+                throw err;
+            }
+        };
         const wrapper = Function("module", "exports", "require", code);
-        wrapper(m, m.exports, require);
+        wrapper(m, m.exports, customRequire);
         cachedModules[filename] = m.exports;
         return m.exports;
     } catch (e) {
@@ -62,103 +130,49 @@ async function loadNuvioScraper(filename) {
     }
 }
 
-addon.defineStreamHandler(async (args) => {
-    const idParts = args.id.split(":");
-    const baseId = idParts[0]; 
-    const season = idParts.length > 1 ? parseInt(idParts[1]) : null;
-    const episode = idParts.length > 2 ? parseInt(idParts[2]) : null;
-    
-    let allStreams = [];
-
-    try {
+async function scrapeAllProviders(baseId, stType, season, episode) {
+    if (!cachedManifest) {
+        try {
+            const localManifestPath = path.join(process.cwd(), "scrapers", "manifest.json");
+            if (fs.existsSync(localManifestPath)) {
+                cachedManifest = JSON.parse(fs.readFileSync(localManifestPath, "utf8"));
+            }
+        } catch (err) {
+            console.warn("Could not load local manifest:", err.message);
+        }
         if (!cachedManifest) {
             const manifestRes = await axios.get(`${NUVIO_RAW_BASE}/manifest.json`);
             cachedManifest = manifestRes.data;
         }
-
-        const scrapePromises = cachedManifest.scrapers.map(async (scraperInfo) => {
-            if (!scraperInfo.enabled) return;
-            
-            const stType = args.type === "series" ? "tv" : args.type;
-            if (!scraperInfo.supportedTypes.includes(stType)) return;
-
-            const scraperModule = await loadNuvioScraper(scraperInfo.filename);
-            if (!scraperModule || typeof scraperModule.getStreams !== "function") return;
-
-            try {
-                // Wait for the scraper with a 9.2 second timeout max
-                const results = await Promise.race([
-                    scraperModule.getStreams(baseId, stType, season, episode).catch(err => {
-                        console.error(`Error running Nuvio scraper ${scraperInfo.name}:`, err.message);
-                        return [];
-                    }),
-                    new Promise((_, reject) => setTimeout(() => reject(new Error('Scraper timeout')), process.env.VERCEL || process.env.RENDER ? 18000 : 9200))
-                ]);
-                
-                if (results && Array.isArray(results)) {
-                    results.forEach(stream => {
-                        let streamUrl = stream.url;
-                        
-                        const isM3U8 = streamUrl.includes(".m3u8");
-                        const hasHeaders = stream.headers && Object.keys(stream.headers).length > 0;
-                        
-                        if (isM3U8 || hasHeaders) {
-                            const headerParams = hasHeaders ? `&${new URLSearchParams(stream.headers).toString()}` : "";
-                            streamUrl = `${HLS_PROXY_URL}/?url=${encodeURIComponent(streamUrl)}${headerParams}`;
-                        }
-
-                        // Remove behaviorHints.notWebReady so streams appear in Stremio Web
-                        let behaviorHints = stream.behaviorHints || {};
-                        if (behaviorHints.notWebReady !== undefined) {
-                            delete behaviorHints.notWebReady;
-                        }
-                        allStreams.push({
-                            name: `Nuvio | ${scraperInfo.name}`,
-                            title: `${stream.quality || 'Auto'} - ${(stream.title || 'Stream').replace(/\r?\n|\r/g, " | ")}`,
-                            url: streamUrl,
-                            behaviorHints: behaviorHints
-                        });
-                    });
-                }
-            } catch (err) {
-                console.error(`Error running Nuvio scraper ${scraperInfo.name}:`, err.message);
-            }
-        });
-
-        // Wait for all scrapers to finish concurrently
-        await Promise.allSettled(scrapePromises);
-    } catch (e) {
-        console.error("Failed to fetch Nuvio manifest:", e.message);
     }
 
-    return { streams: allStreams };
-});
-
-async function runUniversalExtraction(baseId, type = "movie", season = null, episode = null) {
-    const stType = type === "series" || type === "tv" ? "tv" : type;
-    const startTime = Date.now();
-    
-    if (!cachedManifest) {
-        const manifestRes = await axios.get(`${NUVIO_RAW_BASE}/manifest.json`);
-        cachedManifest = manifestRes.data;
+    // Normalize anime/series type so scrapers and TMDB work properly
+    let normalizedType = stType === "series" ? "tv" : stType;
+    if (normalizedType === "anime") {
+        normalizedType = (season !== null && episode !== null) ? "tv" : "movie";
     }
 
     const tasks = [];
     cachedManifest.scrapers.forEach(scraperInfo => {
         if (!scraperInfo.enabled) return;
-        if (!scraperInfo.supportedTypes.includes(stType)) return;
+        const supportsType = scraperInfo.supportedTypes.includes(stType) || 
+                             scraperInfo.supportedTypes.includes(normalizedType) ||
+                             (stType === "anime" && (scraperInfo.supportedTypes.includes("tv") || scraperInfo.supportedTypes.includes("movie")));
+        if (!supportsType) return;
 
         tasks.push(async () => {
             const scraperModule = await loadNuvioScraper(scraperInfo.filename);
-            if (!scraperModule || typeof scraperModule.getStreams !== "function") return [];
+            if (!scraperModule || typeof scraperModule.getStreams !== "function") return { provider: scraperInfo.name, results: [] };
 
             try {
+                // Use 8s timeout on Lambda/Netlify to prevent 502/504 gateway timeouts, 15s on Render/standalone
+                const timeoutMs = (process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.NETLIFY) ? 8000 : 15000;
                 const results = await Promise.race([
-                    scraperModule.getStreams(baseId, stType, season, episode).catch(err => {
+                    scraperModule.getStreams(baseId, normalizedType, season, episode).catch(err => {
                         console.error(`[Extractor] Error in ${scraperInfo.name}:`, err.message);
                         return [];
                     }),
-                    new Promise((_, reject) => setTimeout(() => reject(new Error('Scraper timeout')), 45000))
+                    new Promise((_, reject) => setTimeout(() => reject(new Error('Scraper timeout')), timeoutMs))
                 ]);
                 return { provider: scraperInfo.name, results: Array.isArray(results) ? results : [] };
             } catch (err) {
@@ -170,48 +184,102 @@ async function runUniversalExtraction(baseId, type = "movie", season = null, epi
 
     const executing = [];
     const poolResults = [];
+    const CONCURRENCY_LIMIT = 35; // High concurrency so all scrapers start immediately
     for (const task of tasks) {
         const p = Promise.resolve().then(() => task());
         poolResults.push(p);
-        if (6 <= tasks.length) {
+        if (CONCURRENCY_LIMIT <= tasks.length) {
             const e = p.then(() => executing.splice(executing.indexOf(e), 1));
             executing.push(e);
-            if (executing.length >= 6) {
+            if (executing.length >= CONCURRENCY_LIMIT) {
                 await Promise.race(executing);
             }
         }
     }
 
     const settled = await Promise.allSettled(poolResults);
-    
-    const extractedLinks = [];
-    const providerStats = {};
-
+    const providerData = [];
     settled.forEach(res => {
-        if (res.status === "fulfilled" && res.value && res.value.results) {
-            const { provider, results } = res.value;
-            providerStats[provider] = results.length;
-            
+        if (res.status === "fulfilled" && res.value) {
+            providerData.push(res.value);
+        }
+    });
+    return providerData;
+}
+
+addon.defineStreamHandler(async (args) => {
+    const idParts = args.id.split(":");
+    const baseId = idParts[0];
+    const season = idParts.length > 1 ? parseInt(idParts[1]) : null;
+    const episode = idParts.length > 2 ? parseInt(idParts[2]) : null;
+    const stType = args.type === "series" ? "tv" : args.type;
+
+    let allStreams = [];
+    try {
+        const providerData = await scrapeAllProviders(baseId, stType, season, episode);
+        providerData.forEach(({ provider, results }) => {
             results.forEach(stream => {
-                let proxyUrl = stream.url;
-                const isM3U8 = proxyUrl.includes(".m3u8");
+                if (!stream || !stream.url || typeof stream.url !== "string" || !stream.url.startsWith("http")) return;
+
+                let streamUrl = stream.url;
+                const isM3U8 = streamUrl.includes(".m3u8");
                 const hasHeaders = stream.headers && Object.keys(stream.headers).length > 0;
                 if (isM3U8 || hasHeaders) {
                     const headerParams = hasHeaders ? `&${new URLSearchParams(stream.headers).toString()}` : "";
-                    proxyUrl = `${HLS_PROXY_URL}/?url=${encodeURIComponent(stream.url)}${headerParams}`;
+                    streamUrl = `${HLS_PROXY_URL}/?url=${encodeURIComponent(streamUrl)}${headerParams}`;
                 }
 
-                extractedLinks.push({
-                    provider: provider,
-                    quality: stream.quality || "Auto",
-                    title: (stream.title || "Stream").replace(/\r?\n|\r/g, " | "),
-                    directUrl: stream.url,
-                    proxyUrl: proxyUrl,
-                    headers: stream.headers || {},
-                    behaviorHints: stream.behaviorHints || {}
+                let behaviorHints = stream.behaviorHints || {};
+                if (behaviorHints.notWebReady !== undefined) {
+                    delete behaviorHints.notWebReady;
+                }
+                allStreams.push({
+                    name: `Nuvio | ${provider}`,
+                    title: `${stream.quality || 'Auto'} - ${(stream.title || 'Stream').replace(/\r?\n|\r/g, " | ")}`,
+                    url: streamUrl,
+                    behaviorHints: behaviorHints
                 });
             });
-        }
+        });
+    } catch (err) {
+        console.error("Error in defineStreamHandler:", err.message);
+    }
+    return { streams: allStreams };
+});
+
+async function runUniversalExtraction(id, type, season, episode) {
+    const startTime = Date.now();
+    const stType = type === "series" ? "tv" : type;
+    const baseId = id.split(":")[0];
+
+    const providerData = await scrapeAllProviders(baseId, stType, season, episode);
+
+    const extractedLinks = [];
+    const providerStats = {};
+
+    providerData.forEach(({ provider, results }) => {
+        const validResults = results.filter(stream => stream && stream.url && typeof stream.url === "string" && stream.url.startsWith("http"));
+        providerStats[provider] = validResults.length;
+
+        validResults.forEach(stream => {
+            let proxyUrl = stream.url;
+            const isM3U8 = proxyUrl.includes(".m3u8");
+            const hasHeaders = stream.headers && Object.keys(stream.headers).length > 0;
+            if (isM3U8 || hasHeaders) {
+                const headerParams = hasHeaders ? `&${new URLSearchParams(stream.headers).toString()}` : "";
+                proxyUrl = `${HLS_PROXY_URL}/?url=${encodeURIComponent(stream.url)}${headerParams}`;
+            }
+
+            extractedLinks.push({
+                provider: provider,
+                quality: stream.quality || "Auto",
+                title: (stream.title || "Stream").replace(/\r?\n|\r/g, " | "),
+                directUrl: stream.url,
+                proxyUrl: proxyUrl,
+                headers: stream.headers || {},
+                behaviorHints: stream.behaviorHints || {}
+            });
+        });
     });
 
     return {
@@ -227,6 +295,7 @@ async function runUniversalExtraction(baseId, type = "movie", season = null, epi
 
 const app = express();
 
+// Clean JSON formatting middleware - outputs pure, formatted JSON without HTML wrappers
 app.use((req, res, next) => {
     res.setHeader("Access-Control-Allow-Origin", "*");
     const originalEnd = res.end.bind(res);
@@ -241,76 +310,11 @@ app.use((req, res, next) => {
                 if (contentType.includes("application/json") || strChunk.trim().startsWith("{") || strChunk.trim().startsWith("[")) {
                     try {
                         const data = JSON.parse(strChunk);
-                        const isBrowser = req.headers.accept && req.headers.accept.includes("text/html") && !req.query.raw;
-                        if (isBrowser) {
-                            res.setHeader("Content-Type", "text/html; charset=utf-8");
-                            if (!res.headersSent) res.removeHeader("Content-Length");
-                            const jsonStr = JSON.stringify(data, null, 2);
-                            const totalItems = data.streams ? data.streams.length : (data.totalLinks || 0);
-                            const endpointName = req.originalUrl || req.url;
-                            return originalEnd(`<!DOCTYPE html>
-<html>
-<head>
-    <title>Nuvio Stream Extractor - ${endpointName}</title>
-    <meta charset="utf-8">
-    <style>
-        body { background: #0f172a; color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace; padding: 25px; margin: 0; }
-        .header { background: #1e293b; padding: 20px; border-radius: 12px; border: 1px solid #334155; margin-bottom: 20px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
-        h1 { color: #38bdf8; margin: 0 0 10px 0; font-size: 24px; }
-        .stats { font-size: 14px; color: #94a3b8; }
-        .stats b { color: #f8fafc; }
-        pre { background: #1e293b; padding: 20px; border-radius: 12px; overflow-x: auto; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 13px; line-height: 1.6; border: 1px solid #334155; }
-        .string { color: #86efac; }
-        .number { color: #fba94c; }
-        .boolean { color: #93c5fd; }
-        .null { color: #f87171; }
-        .key { color: #38bdf8; font-weight: 600; }
-        .url-link { color: #60a5fa; text-decoration: underline; }
-    </style>
-</head>
-<body>
-    <div class="header">
-        <h1>🎬 Nuvio Stream Extractor</h1>
-        <div class="stats">
-            Endpoint: <b>${endpointName}</b> &nbsp;|&nbsp; 
-            Total Items: <b>${totalItems}</b>
-        </div>
-    </div>
-    <pre id="json"></pre>
-    <script>
-        const rawJson = ${JSON.stringify(jsonStr)};
-        function syntaxHighlight(json) {
-            json = json.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-            return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\\\[^u]|[^\\\\"])*"(\\s*:)?|\\b(true|false|null)\\b|-?\\d+(?:\\.\\d*)?(?:[eE][+\\-]?\\d+)?)/g, function (match) {
-                var cls = 'number';
-                if (/^"/.test(match)) {
-                    if (/:$/.test(match)) {
-                        cls = 'key';
-                    } else {
-                        cls = 'string';
-                        if (match.indexOf('http') === 1) {
-                            var cleanUrl = match.slice(1, -1);
-                            return '<span class="string">"<a href="' + cleanUrl + '" target="_blank" class="url-link">' + cleanUrl + '</a>"</span>';
-                        }
-                    }
-                } else if (/true|false/.test(match)) {
-                    cls = 'boolean';
-                } else if (/null/.test(match)) {
-                    cls = 'null';
-                }
-                return '<span class="' + cls + '">' + match + '</span>';
-            });
-        }
-        document.getElementById('json').innerHTML = syntaxHighlight(rawJson);
-    </script>
-</body>
-</html>`);
-                        } else {
-                            if (!res.headersSent) res.removeHeader("Content-Length");
-                            return originalEnd(JSON.stringify(data, null, 2), encoding);
-                        }
+                        res.setHeader("Content-Type", "application/json; charset=utf-8");
+                        if (!res.headersSent) res.removeHeader("Content-Length");
+                        return originalEnd(JSON.stringify(data, null, 2), encoding);
                     } catch (e) {
-                        // pass through
+                        // pass through if parsing fails
                     }
                 }
             }
@@ -369,6 +373,15 @@ extRouter.get("/extract/:type/:id", async (req, res) => {
 extRouter.get("/extract/series/:id/:season/:episode", async (req, res) => {
     try {
         const data = await runUniversalExtraction(req.params.id, "series", parseInt(req.params.season), parseInt(req.params.episode));
+        return res.json(data);
+    } catch (err) {
+        return res.status(500).json({ status: "error", message: err.message });
+    }
+});
+
+extRouter.get("/extract/anime/:id/:season/:episode", async (req, res) => {
+    try {
+        const data = await runUniversalExtraction(req.params.id, "anime", parseInt(req.params.season), parseInt(req.params.episode));
         return res.json(data);
     } catch (err) {
         return res.status(500).json({ status: "error", message: err.message });
