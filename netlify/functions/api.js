@@ -32,7 +32,7 @@ async function resolveTmdbId(imdbId) {
     if (tmdbIdCache[imdbId]) return tmdbIdCache[imdbId];
     try {
         const findUrl = `https://api.tmdb.org/3/find/${imdbId}?api_key=${TMDB_API_KEY}&external_source=imdb_id`;
-        const res = await originalFetch(findUrl);
+        const res = await global.fetch(findUrl);
         if (res.ok) {
             const data = await res.json();
             let numericId = null;
@@ -72,9 +72,45 @@ async function processUrlForTmdb(url) {
 }
 
 const originalFetch = global.fetch;
-global.fetch = async (url, options) => {
+global.fetch = async (url, options = {}) => {
     url = await processUrlForTmdb(url);
-    return originalFetch(url, options);
+    if (typeof url !== "string") return originalFetch(url, options);
+
+    if (url.includes("workers.dev") || url.includes("localhost") || url.includes("127.0.0.1")) {
+        return originalFetch(url, options);
+    }
+
+    const doProxyFetch = () => {
+        const headers = options.headers || {};
+        const params = new URLSearchParams();
+        params.set("url", url);
+        for (const [k, v] of Object.entries(headers)) {
+            if (typeof v === "string" && k.toLowerCase() !== "host") {
+                params.set(k, v);
+            }
+        }
+        const proxyUrl = `${HLS_PROXY_URL}/?${params.toString()}`;
+        return originalFetch(proxyUrl, {
+            ...options,
+            headers: {
+                ...headers,
+                "User-Agent": headers["User-Agent"] || "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0 Safari/537.36"
+            }
+        });
+    };
+
+    try {
+        const directRes = await Promise.race([
+            originalFetch(url, options),
+            new Promise((_, reject) => setTimeout(() => reject(new Error("Direct fetch timeout")), 4500))
+        ]);
+        if ([403, 503, 520, 522, 524, 429].includes(directRes.status)) {
+            return await doProxyFetch();
+        }
+        return directRes;
+    } catch (err) {
+        return await doProxyFetch();
+    }
 };
 
 axios.interceptors.request.use(async (config) => {
@@ -83,6 +119,45 @@ axios.interceptors.request.use(async (config) => {
     }
     return config;
 });
+
+axios.interceptors.response.use(
+    (response) => {
+        if ([403, 503, 520, 522, 524, 429].includes(response.status)) {
+            const config = response.config;
+            if (config && !config._retry && typeof config.url === "string" && !config.url.includes("workers.dev")) {
+                config._retry = true;
+                const headers = config.headers || {};
+                const params = new URLSearchParams();
+                params.set("url", config.url);
+                for (const [k, v] of Object.entries(headers)) {
+                    if (typeof v === "string" && k.toLowerCase() !== "host") {
+                        params.set(k, v);
+                    }
+                }
+                config.url = `${HLS_PROXY_URL}/?${params.toString()}`;
+                return axios(config);
+            }
+        }
+        return response;
+    },
+    async (error) => {
+        const config = error.config;
+        if (!config || config._retry || (typeof config.url === "string" && (config.url.includes("workers.dev") || config.url.includes("localhost")))) {
+            return Promise.reject(error);
+        }
+        config._retry = true;
+        const headers = config.headers || {};
+        const params = new URLSearchParams();
+        params.set("url", config.url);
+        for (const [k, v] of Object.entries(headers)) {
+            if (typeof v === "string" && k.toLowerCase() !== "host") {
+                params.set(k, v);
+            }
+        }
+        config.url = `${HLS_PROXY_URL}/?${params.toString()}`;
+        return axios(config);
+    }
+);
 // ------------------------------------------------
 
 const addon = new addonBuilder({
@@ -113,6 +188,12 @@ async function loadNuvioScraper(filename) {
             if (mod === "cheerio") return require("cheerio");
             if (mod === "crypto-js") return require("crypto-js");
             if (mod === "axios") return require("axios");
+            if (mod === "node-fetch" || mod === "undici" || mod === "cross-fetch") {
+                const f = async (url, opts) => global.fetch(url, opts);
+                f.default = f;
+                f.fetch = f;
+                return f;
+            }
             try {
                 return require(mod);
             } catch (err) {
@@ -152,6 +233,13 @@ async function scrapeAllProviders(baseId, stType, season, episode) {
         normalizedType = (season !== null && episode !== null) ? "tv" : "movie";
     }
 
+    // Resolve IMDb ID to numeric TMDB ID so providers expecting numeric ID or IMDb ID both work
+    let numericId = baseId;
+    if (typeof baseId === "string" && baseId.startsWith("tt")) {
+        const resId = await resolveTmdbId(baseId);
+        if (resId && resId !== baseId) numericId = resId;
+    }
+
     const tasks = [];
     cachedManifest.scrapers.forEach(scraperInfo => {
         if (!scraperInfo.enabled) return;
@@ -165,13 +253,24 @@ async function scrapeAllProviders(baseId, stType, season, episode) {
             if (!scraperModule || typeof scraperModule.getStreams !== "function") return { provider: scraperInfo.name, results: [] };
 
             try {
-                // Use 8s timeout on Lambda/Netlify to prevent 502/504 gateway timeouts, 15s on Render/standalone
-                const timeoutMs = (process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.NETLIFY) ? 8000 : 15000;
-                const results = await Promise.race([
-                    scraperModule.getStreams(baseId, normalizedType, season, episode).catch(err => {
-                        console.error(`[Extractor] Error in ${scraperInfo.name}:`, err.message);
+                // Use 90s timeout for all environments since this is for personal JSON API usage
+                const timeoutMs = 90000;
+                const runScraper = async (idToUse) => {
+                    try {
+                        const res = await scraperModule.getStreams(idToUse, normalizedType, season, episode);
+                        return Array.isArray(res) ? res : [];
+                    } catch (e) {
                         return [];
-                    }),
+                    }
+                };
+                const resultsPromise = (async () => {
+                    const res1 = await runScraper(numericId);
+                    if (res1.length > 0 || numericId === baseId) return res1;
+                    return await runScraper(baseId);
+                })();
+
+                const results = await Promise.race([
+                    resultsPromise,
                     new Promise((_, reject) => setTimeout(() => reject(new Error('Scraper timeout')), timeoutMs))
                 ]);
                 return { provider: scraperInfo.name, results: Array.isArray(results) ? results : [] };
@@ -184,7 +283,7 @@ async function scrapeAllProviders(baseId, stType, season, episode) {
 
     const executing = [];
     const poolResults = [];
-    const CONCURRENCY_LIMIT = 35; // High concurrency so all scrapers start immediately
+    const CONCURRENCY_LIMIT = 61; // High concurrency so all 61 scrapers run simultaneously
     for (const task of tasks) {
         const p = Promise.resolve().then(() => task());
         poolResults.push(p);
