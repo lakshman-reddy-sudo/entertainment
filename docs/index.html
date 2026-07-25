@@ -103,14 +103,24 @@
 
                     <!-- Dual Submit Buttons for Primary & Backup Engines -->
                     <div class="form-actions dual-submit">
-                        <button type="button" id="btn-submit-render" class="btn-primary" onclick="triggerScrape('render')">
-                            <i data-lucide="zap" class="btn-icon-left"></i>
-                            <span>⚡ Get Links (Primary Render)</span>
+                        <button type="button" id="btn-submit-render" class="engine-card-btn engine-render" onclick="triggerScrape('render')">
+                            <div class="engine-btn-icon">
+                                <i data-lucide="zap"></i>
+                            </div>
+                            <div class="engine-btn-text">
+                                <span class="engine-btn-title">⚡ Get Links (Primary Render)</span>
+                                <span class="engine-btn-subtitle">Cloud Engine • 61 Providers • 4K & Multi-Audio</span>
+                            </div>
                             <div class="spinner hidden"></div>
                         </button>
-                        <button type="button" id="btn-submit-netlify" class="btn-secondary backup-btn" onclick="triggerScrape('netlify')">
-                            <i data-lucide="shield-check" class="btn-icon-left"></i>
-                            <span>🛡️ Get Links (Backup Netlify)</span>
+                        <button type="button" id="btn-submit-netlify" class="engine-card-btn engine-netlify" onclick="triggerScrape('netlify')">
+                            <div class="engine-btn-icon">
+                                <i data-lucide="shield-check"></i>
+                            </div>
+                            <div class="engine-btn-text">
+                                <span class="engine-btn-title">🛡️ Get Links (Backup Netlify)</span>
+                                <span class="engine-btn-subtitle">Serverless API • High Availability • Instant Proxy</span>
+                            </div>
                             <div class="spinner hidden"></div>
                         </button>
                     </div>
