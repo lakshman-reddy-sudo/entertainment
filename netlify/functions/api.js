@@ -487,6 +487,8 @@ extRouter.get("/extract/anime/:id/:season/:episode", async (req, res) => {
     }
 });
 
+app.use("/ui", express.static(path.join(process.cwd(), "docs")));
+app.use("/explorer", express.static(path.join(process.cwd(), "docs")));
 app.use("/.netlify/functions/api", extRouter);
 app.use("/api", extRouter);
 app.use("/", extRouter);

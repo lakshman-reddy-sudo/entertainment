@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nuvio Stream Explorer | Universal API Dashboard</title>
+    <meta name="description" content="Universal Multi-Provider Stream Extractor and JSON Explorer for Movies, Series, and Anime. Powered by Nuvio Engine with 61 scrapers.">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- HLS.js for Video Playing -->
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Background Glow Elements -->
+    <div class="glow-sphere sphere-1"></div>
+    <div class="glow-sphere sphere-2"></div>
+    <div class="glow-sphere sphere-3"></div>
+
+    <!-- Toast Container -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- Navigation Header -->
+    <header class="navbar">
+        <div class="nav-container">
+            <div class="logo-group">
+                <div class="logo-icon">
+                    <i data-lucide="zap" class="icon-pulse"></i>
+                </div>
+                <div class="logo-text">
+                    <h1>Nuvio <span>Explorer</span></h1>
+                    <span class="badge">v2.0 • 61 Providers</span>
+                </div>
+            </div>
+            <div class="nav-controls">
+                <div class="status-indicator tooltip" data-tooltip="Backend API Ready">
+                    <span class="status-dot"></span>
+                    <span class="status-label" id="backend-status-text">Connected</span>
+                </div>
+                <button id="btn-settings" class="btn-icon tooltip" data-tooltip="API Settings">
+                    <i data-lucide="settings"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Hero Search Section -->
+        <section class="hero-section">
+            <div class="hero-header">
+                <h2>Universal Stream & JSON Inspector</h2>
+                <p>Query 61 automated scrapers instantly. Extract 4K, 1080p, and multi-audio links for any IMDb or TMDB ID with proxy fallback.</p>
+            </div>
+
+            <div class="query-card glass-panel">
+                <form id="scrape-form" class="query-form">
+                    <!-- Media Type Selector -->
+                    <div class="type-selector">
+                        <label class="type-option active">
+                            <input type="radio" name="media-type" value="movie" checked>
+                            <i data-lucide="film"></i>
+                            <span>Movie</span>
+                        </label>
+                        <label class="type-option">
+                            <input type="radio" name="media-type" value="series">
+                            <i data-lucide="tv"></i>
+                            <span>Series</span>
+                        </label>
+                        <label class="type-option">
+                            <input type="radio" name="media-type" value="anime">
+                            <i data-lucide="sparkles"></i>
+                            <span>Anime</span>
+                        </label>
+                    </div>
+
+                    <!-- ID Input Group -->
+                    <div class="input-row">
+                        <div class="input-group flex-grow">
+                            <label for="media-id" class="input-label">IMDb or TMDB ID</label>
+                            <div class="input-wrapper">
+                                <i data-lucide="search" class="input-icon"></i>
+                                <input type="text" id="media-id" name="media-id" placeholder="e.g. tt5607616, tt0816692, 157336..." required autocomplete="off">
+                                <button type="button" id="btn-clear-id" class="btn-clear hidden">
+                                    <i data-lucide="x"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Episode Controls (Hidden by default for movies) -->
+                        <div id="episode-controls" class="episode-controls hidden">
+                            <div class="input-group small-input">
+                                <label for="season-num" class="input-label">Season</label>
+                                <input type="number" id="season-num" name="season-num" value="1" min="1" max="50">
+                            </div>
+                            <div class="input-group small-input">
+                                <label for="episode-num" class="input-label">Episode</label>
+                                <input type="number" id="episode-num" name="episode-num" value="1" min="1" max="2000">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Submit Button -->
+                    <div class="form-actions">
+                        <button type="submit" id="btn-submit" class="btn-primary">
+                            <i data-lucide="cpu" class="btn-icon-left"></i>
+                            <span>Extract Streams</span>
+                            <div class="spinner hidden"></div>
+                        </button>
+                    </div>
+                </form>
+
+                <!-- Quick Test Chips -->
+                <div class="quick-chips">
+                    <span class="chips-label"><i data-lucide="flame"></i> Quick Tests:</span>
+                    <button type="button" class="chip" data-id="tt0816692" data-type="movie">
+                        <span>🚀 Interstellar (Movie)</span>
+                    </button>
+                    <button type="button" class="chip" data-id="tt5607616" data-type="anime" data-s="1" data-e="1">
+                        <span>👺 Re:Zero (Anime S1E1)</span>
+                    </button>
+                    <button type="button" class="chip" data-id="tt29583160" data-type="anime" data-s="1" data-e="1">
+                        <span>🗡️ Solo Leveling (Anime S1E1)</span>
+                    </button>
+                    <button type="button" class="chip" data-id="tt0903747" data-type="series" data-s="1" data-e="1">
+                        <span>🧪 Breaking Bad (Series S1E1)</span>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Live Status / Loading Banner -->
+        <section id="status-section" class="status-section hidden">
+            <div class="status-card glass-panel">
+                <div class="status-spinner-wrap">
+                    <div class="pulse-ring"></div>
+                    <i data-lucide="satellite" class="status-icon"></i>
+                </div>
+                <div class="status-details">
+                    <h3 id="status-title">Crawling 61 Providers...</h3>
+                    <p id="status-desc">Resolving IDs and searching mirrors via Cloudflare proxy. Deep scrapers have a 90s completion window.</p>
+                    <div class="progress-bar-container">
+                        <div id="progress-bar" class="progress-bar"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Results & Workspace Section -->
+        <section id="results-section" class="results-section hidden">
+            <div class="results-header glass-panel">
+                <div class="results-stats">
+                    <div class="stat-box">
+                        <span class="stat-val" id="stat-providers">0</span>
+                        <span class="stat-lbl">Active Providers</span>
+                    </div>
+                    <div class="stat-box">
+                        <span class="stat-val accent-val" id="stat-streams">0</span>
+                        <span class="stat-lbl">Total Streams</span>
+                    </div>
+                    <div class="stat-box">
+                        <span class="stat-val time-val" id="stat-time">0.0s</span>
+                        <span class="stat-lbl">Execution Time</span>
+                    </div>
+                </div>
+
+                <div class="results-actions">
+                    <div class="tab-controls">
+                        <button type="button" class="tab-btn active" data-tab="grid-view">
+                            <i data-lucide="layout-grid"></i>
+                            <span>Stream Grid</span>
+                        </button>
+                        <button type="button" class="tab-btn" data-tab="json-view">
+                            <i data-lucide="code"></i>
+                            <span>Raw JSON</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab Content: Stream Grid -->
+            <div id="grid-view" class="tab-pane active">
+                <div class="filter-bar glass-panel">
+                    <div class="search-filter">
+                        <i data-lucide="filter"></i>
+                        <input type="text" id="stream-filter-input" placeholder="Filter by provider, resolution, or audio (e.g. 1080p, Hindi, Torrentio)...">
+                    </div>
+                    <div class="badge-filters">
+                        <button class="filter-badge active" data-filter="all">All</button>
+                        <button class="filter-badge" data-filter="4k">4K / UHD</button>
+                        <button class="filter-badge" data-filter="1080p">1080p</button>
+                        <button class="filter-badge" data-filter="720p">720p</button>
+                        <button class="filter-badge" data-filter="hindi">Hindi / Multi</button>
+                    </div>
+                </div>
+
+                <div id="streams-grid" class="streams-grid">
+                    <!-- Stream cards inserted here dynamically -->
+                </div>
+                <div id="no-streams-msg" class="no-results hidden">
+                    <i data-lucide="alert-circle"></i>
+                    <p>No playable streams matched your query or filter.</p>
+                </div>
+            </div>
+
+            <!-- Tab Content: Raw JSON -->
+            <div id="json-view" class="tab-pane hidden">
+                <div class="json-toolbar glass-panel">
+                    <span class="json-info"><i data-lucide="file-json"></i> Standard Stremio / Nuvio JSON Schema</span>
+                    <div class="json-buttons">
+                        <button type="button" id="btn-copy-json" class="btn-secondary">
+                            <i data-lucide="copy"></i>
+                            <span>Copy JSON</span>
+                        </button>
+                        <button type="button" id="btn-download-json" class="btn-secondary">
+                            <i data-lucide="download"></i>
+                            <span>Download .json</span>
+                        </button>
+                    </div>
+                </div>
+                <div class="json-container glass-panel">
+                    <pre><code id="json-code-display"></code></pre>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <p>Built with ❤️ for High-Performance Stream Extraction • <a href="https://github.com/lakshman-reddy-sudo/entertainment" target="_blank" rel="noopener">GitHub Repository</a></p>
+    </footer>
+
+    <!-- Video Modal Player -->
+    <div id="video-modal" class="modal-overlay hidden">
+        <div class="modal-card video-modal-card glass-panel">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <i data-lucide="play-circle" class="accent-icon"></i>
+                    <span id="player-title">Stream Preview</span>
+                </div>
+                <button type="button" class="btn-close-modal" id="btn-close-player">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <div class="player-wrapper">
+                <video id="video-player" controls autoplay class="video-element"></video>
+                <div id="player-error" class="player-error hidden">
+                    <i data-lucide="alert-triangle"></i>
+                    <p>Unable to play stream directly in browser. This stream may require external headers, an external media player (VLC/MPV), or is a direct download archive.</p>
+                    <a id="player-external-link" href="#" target="_blank" class="btn-secondary mt-2">Open Externally</a>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <span class="player-meta" id="player-meta-info">HLS / MP4 Stream</span>
+                <button type="button" class="btn-secondary" id="btn-copy-player-url">Copy Stream URL</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="modal-overlay hidden">
+        <div class="modal-card glass-panel">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <i data-lucide="sliders"></i>
+                    <span>Backend API Configuration</span>
+                </div>
+                <button type="button" class="btn-close-modal" id="btn-close-settings">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p class="settings-desc">Select which backend instance executes the 61 provider scrapers and proxy interception.</p>
+                
+                <div class="settings-group">
+                    <label class="settings-label">Backend Instance URL</label>
+                    <div class="api-preset-options">
+                        <label class="preset-radio">
+                            <input type="radio" name="api-preset" value="render" checked>
+                            <span class="preset-card">
+                                <strong>☁️ Render Cloud</strong>
+                                <small>nuvio-stremio-addon.onrender.com</small>
+                            </span>
+                        </label>
+                        <label class="preset-radio">
+                            <input type="radio" name="api-preset" value="netlify">
+                            <span class="preset-card">
+                                <strong>⚡ Netlify Functions</strong>
+                                <small>nuvio-stremio-addon.netlify.app</small>
+                            </span>
+                        </label>
+                        <label class="preset-radio">
+                            <input type="radio" name="api-preset" value="local">
+                            <span class="preset-card">
+                                <strong>💻 Localhost (Dev)</strong>
+                                <small>http://localhost:3000</small>
+                            </span>
+                        </label>
+                        <label class="preset-radio">
+                            <input type="radio" name="api-preset" value="custom">
+                            <span class="preset-card">
+                                <strong>🔧 Custom URL</strong>
+                                <small>Specify your own endpoint</small>
+                            </span>
+                        </label>
+                    </div>
+
+                    <div id="custom-url-group" class="input-group mt-3 hidden">
+                        <label for="custom-api-url" class="input-label">Custom API Base URL</label>
+                        <input type="url" id="custom-api-url" placeholder="https://your-custom-backend.com">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer flex-right">
+                <button type="button" class="btn-primary" id="btn-save-settings">Save & Apply</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
