@@ -104,11 +104,16 @@
                         </div>
                     </div>
 
-                    <!-- Submit Button -->
-                    <div class="form-actions">
-                        <button type="submit" id="btn-submit" class="btn-primary">
-                            <i data-lucide="cpu" class="btn-icon-left"></i>
-                            <span>Extract Streams</span>
+                    <!-- Dual Submit Buttons for Primary & Backup Engines -->
+                    <div class="form-actions dual-submit">
+                        <button type="button" id="btn-submit-render" class="btn-primary" onclick="triggerScrape('render')">
+                            <i data-lucide="zap" class="btn-icon-left"></i>
+                            <span>⚡ Get Links (Primary Render)</span>
+                            <div class="spinner hidden"></div>
+                        </button>
+                        <button type="button" id="btn-submit-netlify" class="btn-secondary backup-btn" onclick="triggerScrape('netlify')">
+                            <i data-lucide="shield-check" class="btn-icon-left"></i>
+                            <span>🛡️ Get Links (Backup Netlify)</span>
                             <div class="spinner hidden"></div>
                         </button>
                     </div>
@@ -174,6 +179,10 @@
                             <i data-lucide="layout-grid"></i>
                             <span>Stream Grid</span>
                         </button>
+                        <button type="button" class="tab-btn" data-tab="links-view">
+                            <i data-lucide="link-2"></i>
+                            <span>🔗 Extracted Links Table</span>
+                        </button>
                         <button type="button" class="tab-btn" data-tab="json-view">
                             <i data-lucide="code"></i>
                             <span>Raw JSON</span>
@@ -204,6 +213,36 @@
                 <div id="no-streams-msg" class="no-results hidden">
                     <i data-lucide="alert-circle"></i>
                     <p>No playable streams matched your query or filter.</p>
+                </div>
+            </div>
+
+            <!-- Tab Content: Extracted Links Table -->
+            <div id="links-view" class="tab-pane hidden">
+                <div class="links-toolbar glass-panel">
+                    <div class="links-info">
+                        <i data-lucide="link"></i>
+                        <span>Direct copy-pasteable stream URLs from all responding providers</span>
+                    </div>
+                    <button type="button" id="btn-copy-all-links" class="btn-primary copy-all-btn">
+                        <i data-lucide="clipboard-copy"></i>
+                        <span>📋 Copy All Links (One Per Line)</span>
+                    </button>
+                </div>
+                <div class="links-table-container glass-panel">
+                    <table class="links-table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Provider</th>
+                                <th>Quality & Info</th>
+                                <th>Direct URL</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="links-table-body">
+                            <!-- Rows inserted dynamically -->
+                        </tbody>
+                    </table>
                 </div>
             </div>
 

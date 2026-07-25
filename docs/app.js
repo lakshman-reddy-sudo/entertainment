@@ -1,6 +1,6 @@
 /**
  * Nuvio Stream Explorer | Frontend Dashboard Logic
- * Universal stream extraction engine UI with live JSON inspector and HLS player.
+ * Universal stream extraction engine UI with live JSON inspector, Extracted Links table, and HLS player.
  */
 
 // Preset Backend API Endpoints from README.md
@@ -45,8 +45,10 @@ function initBackendSettings() {
     if (presetRadio) presetRadio.checked = true;
 
     if (savedPreset === "custom" && savedCustomUrl) {
-        document.getElementById("custom-api-url").value = savedCustomUrl;
-        document.getElementById("custom-url-group").classList.remove("hidden");
+        const customField = document.getElementById("custom-api-url");
+        if (customField) customField.value = savedCustomUrl;
+        const customGroup = document.getElementById("custom-url-group");
+        if (customGroup) customGroup.classList.remove("hidden");
         currentBackendUrl = savedCustomUrl.replace(/\/$/, "");
     } else {
         currentBackendUrl = API_PRESETS[savedPreset] || API_PRESETS.render;
@@ -58,13 +60,14 @@ function initBackendSettings() {
 function updateStatusIndicator() {
     const statusText = document.getElementById("backend-status-text");
     const statusDot = document.querySelector(".status-dot");
+    if (!statusText || !statusDot) return;
 
     if (currentBackendUrl.includes("localhost")) {
         statusText.textContent = "Local Dev API";
         statusDot.style.backgroundColor = "#38bdf8";
         statusDot.style.boxShadow = "0 0 8px #38bdf8";
     } else if (currentBackendUrl.includes("netlify")) {
-        statusText.textContent = "Netlify API";
+        statusText.textContent = "Netlify API (Backup)";
         statusDot.style.backgroundColor = "#a855f7";
         statusDot.style.boxShadow = "0 0 8px #a855f7";
     } else {
@@ -72,6 +75,34 @@ function updateStatusIndicator() {
         statusDot.style.backgroundColor = "#10b981";
         statusDot.style.boxShadow = "0 0 8px #10b981";
     }
+}
+
+/**
+ * Trigger Scrape from Dual Submit Buttons (Render vs Netlify)
+ */
+function triggerScrape(engineType) {
+    if (engineType === "render") {
+        currentBackendUrl = API_PRESETS.render;
+        localStorage.setItem("nuvio_api_preset", "render");
+    } else if (engineType === "netlify") {
+        currentBackendUrl = API_PRESETS.netlify;
+        localStorage.setItem("nuvio_api_preset", "netlify");
+    }
+    updateStatusIndicator();
+
+    const mediaIdInput = document.getElementById("media-id");
+    const id = mediaIdInput.value.trim();
+    const type = document.querySelector('input[name="media-type"]:checked').value;
+    const season = document.getElementById("season-num").value || 1;
+    const episode = document.getElementById("episode-num").value || 1;
+
+    if (!id) {
+        showToast("⚠️ Please enter a valid IMDb or TMDB ID");
+        mediaIdInput.focus();
+        return;
+    }
+
+    executeExtraction(id, type, season, episode, engineType);
 }
 
 /**
@@ -113,29 +144,22 @@ function setupFormControls() {
         mediaIdInput.focus();
     });
 
-    // Form Submission
-    scrapeForm.addEventListener("submit", async (e) => {
+    // Form Submission fallback (Enter key defaults to Render Primary)
+    scrapeForm.addEventListener("submit", (e) => {
         e.preventDefault();
-        const id = mediaIdInput.value.trim();
-        const type = document.querySelector('input[name="media-type"]:checked').value;
-        const season = document.getElementById("season-num").value || 1;
-        const episode = document.getElementById("episode-num").value || 1;
-
-        if (!id) {
-            showToast("⚠️ Please enter a valid IMDb or TMDB ID");
-            return;
-        }
-
-        executeExtraction(id, type, season, episode);
+        triggerScrape("render");
     });
 }
 
 /**
  * Execute Extraction Request against Backend API
  */
-async function executeExtraction(id, type, season, episode) {
-    const btnSubmit = document.getElementById("btn-submit");
-    const spinner = btnSubmit.querySelector(".spinner");
+async function executeExtraction(id, type, season, episode, engineType = "render") {
+    const btnRender = document.getElementById("btn-submit-render");
+    const btnNetlify = document.getElementById("btn-submit-netlify");
+    const activeBtn = engineType === "netlify" ? btnNetlify : btnRender;
+    const spinner = activeBtn ? activeBtn.querySelector(".spinner") : null;
+
     const statusSection = document.getElementById("status-section");
     const resultsSection = document.getElementById("results-section");
     const progressBar = document.getElementById("progress-bar");
@@ -148,17 +172,20 @@ async function executeExtraction(id, type, season, episode) {
     }
 
     // UI state to Loading
-    btnSubmit.disabled = true;
-    spinner.classList.remove("hidden");
+    if (btnRender) btnRender.disabled = true;
+    if (btnNetlify) btnNetlify.disabled = true;
+    if (spinner) spinner.classList.remove("hidden");
     statusSection.classList.remove("hidden");
     resultsSection.classList.add("hidden");
-    statusTitle.textContent = `Crawling 61 Providers for ${id.toUpperCase()}...`;
+    
+    const serverName = engineType === "netlify" ? "Netlify Backup API" : "Render Primary API";
+    statusTitle.textContent = `Crawling 61 Providers via ${serverName} for ${id.toUpperCase()}...`;
 
     // Smooth simulated progress bar (up to 90s)
     let progress = 5;
     progressBar.style.width = `${progress}%`;
     const progressInterval = setInterval(() => {
-        if (progress < 90) {
+        if (progress < 92) {
             progress += Math.floor(Math.random() * 4) + 1;
             progressBar.style.width = `${progress}%`;
         }
@@ -214,6 +241,7 @@ async function executeExtraction(id, type, season, episode) {
 
         // Render Views
         renderStreamCards(allStreams);
+        renderLinksTable(allStreams);
         renderRawJson(data);
 
         // Transition UI to Results
@@ -221,18 +249,20 @@ async function executeExtraction(id, type, season, episode) {
             statusSection.classList.add("hidden");
             resultsSection.classList.remove("hidden");
             resultsSection.scrollIntoView({ behavior: "smooth", block: "start" });
-            btnSubmit.disabled = false;
-            spinner.classList.add("hidden");
+            if (btnRender) btnRender.disabled = false;
+            if (btnNetlify) btnNetlify.disabled = false;
+            if (spinner) spinner.classList.add("hidden");
         }, 500);
 
-        showToast(`✅ Successfully extracted ${allStreams.length} streams!`);
+        showToast(`✅ Successfully extracted ${allStreams.length} streams via ${serverName}!`);
 
     } catch (error) {
         clearInterval(progressInterval);
-        btnSubmit.disabled = false;
-        spinner.classList.add("hidden");
+        if (btnRender) btnRender.disabled = false;
+        if (btnNetlify) btnNetlify.disabled = false;
+        if (spinner) spinner.classList.add("hidden");
         statusSection.classList.add("hidden");
-        showToast(`❌ Extraction Failed: ${error.message}`);
+        showToast(`❌ Extraction Failed on ${serverName}: ${error.message}`);
         console.error("Scraper Engine Error:", error);
     }
 }
@@ -318,11 +348,74 @@ function renderStreamCards(streams) {
 }
 
 /**
+ * Render Extracted Links Table (Copy-Paste Friendly View)
+ */
+function renderLinksTable(streams) {
+    const tbody = document.getElementById("links-table-body");
+    const btnCopyAll = document.getElementById("btn-copy-all-links");
+    if (!tbody) return;
+    tbody.innerHTML = "";
+
+    if (!streams || streams.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 2rem; color: var(--text-muted);">No stream URLs extracted.</td></tr>`;
+        return;
+    }
+
+    streams.forEach((stream, index) => {
+        const row = document.createElement("tr");
+        let displayTitle = (stream.title || stream.name || "Direct Video Stream")
+            .replace(/\\n/g, " • ")
+            .replace(/\n/g, " • ");
+
+        let qualityTag = "720p/SD";
+        const titleLower = displayTitle.toLowerCase();
+        if (titleLower.includes("4k") || titleLower.includes("2160") || titleLower.includes("uhd")) qualityTag = "4K UHD";
+        else if (titleLower.includes("1080")) qualityTag = "1080p FHD";
+
+        row.innerHTML = `
+            <td style="font-family: var(--font-mono); color: var(--text-muted);">${index + 1}</td>
+            <td><strong style="color: var(--accent-primary);">${escapeHtml(stream.providerName)}</strong></td>
+            <td><span class="meta-tag" style="margin:0;">${qualityTag}</span> <small style="display:block; color: var(--text-muted); margin-top: 4px;">${escapeHtml(displayTitle)}</small></td>
+            <td>
+                <div class="link-url-cell" onclick="copyStreamUrl(${index})" title="Click to copy this URL">
+                    ${escapeHtml(stream.url)}
+                </div>
+            </td>
+            <td>
+                <div class="tbl-actions">
+                    <button type="button" class="btn-secondary" style="padding: 0.4rem 0.7rem; font-size: 0.8rem;" onclick="copyStreamUrl(${index})">
+                        <i data-lucide="copy" style="width:14px; height:14px;"></i> Copy
+                    </button>
+                    <button type="button" class="btn-primary" style="padding: 0.4rem 0.7rem; font-size: 0.8rem;" onclick="openPlayerModal(${index})">
+                        <i data-lucide="play" style="width:14px; height:14px;"></i> Play
+                    </button>
+                    <a href="${stream.url}" target="_blank" rel="noopener" class="btn-secondary" style="padding: 0.4rem 0.7rem; font-size: 0.8rem; display:inline-flex; align-items:center;">
+                        <i data-lucide="external-link" style="width:14px; height:14px;"></i>
+                    </a>
+                </div>
+            </td>
+        `;
+        tbody.appendChild(row);
+    });
+
+    if (btnCopyAll) {
+        btnCopyAll.onclick = () => {
+            const allUrls = streams.map(s => s.url).filter(Boolean).join("\n");
+            navigator.clipboard.writeText(allUrls);
+            showToast(`📋 Copied all ${streams.length} stream links (one per line) to clipboard!`);
+        };
+    }
+
+    if (window.lucide) lucide.createIcons();
+}
+
+/**
  * Filter Controls
  */
 function setupFilterControls() {
     const searchInput = document.getElementById("stream-filter-input");
     const badgeButtons = document.querySelectorAll(".filter-badge");
+    if (!searchInput) return;
 
     searchInput.addEventListener("input", applyFilters);
 
@@ -378,12 +471,14 @@ function applyFilters() {
 }
 
 /**
- * Raw JSON Inspector
+ * Raw JSON Inspector with Colorful Syntax Highlighting
  */
 function renderRawJson(data) {
     const codeDisplay = document.getElementById("json-code-display");
     const jsonStr = JSON.stringify(data, null, 2);
-    codeDisplay.textContent = jsonStr;
+
+    // Apply color-coded syntax highlighting
+    codeDisplay.innerHTML = syntaxHighlightJson(jsonStr);
 
     document.getElementById("btn-copy-json").onclick = () => {
         navigator.clipboard.writeText(jsonStr);
@@ -400,6 +495,32 @@ function renderRawJson(data) {
         URL.revokeObjectURL(url);
         showToast("💾 JSON file download started!");
     };
+}
+
+/**
+ * Helper: Syntax Highlight JSON strings for vibrant display
+ */
+function syntaxHighlightJson(json) {
+    json = json.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, function (match) {
+        let cls = 'json-number';
+        if (/^"/.test(match)) {
+            if (/:$/.test(match)) {
+                cls = 'json-key';
+            } else {
+                if (match.includes('http://') || match.includes('https://')) {
+                    cls = 'json-url';
+                } else {
+                    cls = 'json-string';
+                }
+            }
+        } else if (/true|false/.test(match)) {
+            cls = 'json-boolean';
+        } else if (/null/.test(match)) {
+            cls = 'json-null';
+        }
+        return '<span class="' + cls + '">' + match + '</span>';
+    });
 }
 
 /**
@@ -445,8 +566,8 @@ function setupQuickChips() {
                 document.getElementById("episode-num").value = e;
             }
 
-            // Trigger submit automatically
-            document.getElementById("scrape-form").dispatchEvent(new Event("submit"));
+            // Trigger scrape using Render Primary by default
+            triggerScrape("render");
         });
     });
 }
