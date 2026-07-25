@@ -267,18 +267,11 @@ async function scrapeAllProviders(baseId, stType, season, episode) {
                     if (numericId === baseId) {
                         return await runScraper(baseId);
                     }
-                    const [res1, res2] = await Promise.all([
-                        runScraper(numericId),
-                        runScraper(baseId)
-                    ]);
-                    const combined = [...(Array.isArray(res1) ? res1 : []), ...(Array.isArray(res2) ? res2 : [])];
-                    const seen = new Set();
-                    return combined.filter(s => {
-                        if (!s || !s.url) return false;
-                        if (seen.has(s.url)) return false;
-                        seen.add(s.url);
-                        return true;
-                    });
+                    let res = await runScraper(baseId);
+                    if (!res || res.length === 0) {
+                        res = await runScraper(numericId);
+                    }
+                    return res;
                 })();
 
                 const results = await Promise.race([
