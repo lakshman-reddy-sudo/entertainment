@@ -225,91 +225,33 @@ async function runUniversalExtraction(baseId, type = "movie", season = null, epi
     };
 }
 
-function sendFormattedResponse(req, res, data) {
-    res.setHeader("Access-Control-Allow-Origin", "*");
-    const isBrowser = req.headers.accept && req.headers.accept.includes("text/html") && !req.query.raw;
-    if (isBrowser) {
-        res.setHeader("Content-Type", "text/html; charset=utf-8");
-        const jsonStr = JSON.stringify(data, null, 2);
-        return res.status(200).send(`<!DOCTYPE html>
-<html>
-<head>
-    <title>Nuvio Universal Extractor - ${data.query.id}</title>
-    <meta charset="utf-8">
-    <style>
-        body { background: #0f172a; color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace; padding: 25px; margin: 0; }
-        .header { background: #1e293b; padding: 20px; border-radius: 12px; border: 1px solid #334155; margin-bottom: 20px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
-        h1 { color: #38bdf8; margin: 0 0 10px 0; font-size: 24px; }
-        .stats { font-size: 14px; color: #94a3b8; }
-        .stats b { color: #f8fafc; }
-        pre { background: #1e293b; padding: 20px; border-radius: 12px; overflow-x: auto; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 13px; line-height: 1.6; border: 1px solid #334155; }
-        .string { color: #86efac; }
-        .number { color: #fba94c; }
-        .boolean { color: #93c5fd; }
-        .null { color: #f87171; }
-        .key { color: #38bdf8; font-weight: 600; }
-        .url-link { color: #60a5fa; text-decoration: underline; }
-    </style>
-</head>
-<body>
-    <div class="header">
-        <h1>🎬 Nuvio Universal Link Extractor</h1>
-        <div class="stats">
-            Query: <b>${data.query.type.toUpperCase()} (${data.query.id})</b> &nbsp;|&nbsp; 
-            Total Direct Links: <b>${data.totalLinks}</b> &nbsp;|&nbsp; 
-            Active Providers: <b>${data.activeProviders}</b> &nbsp;|&nbsp; 
-            Time Taken: <b>${(data.timeTakenMs / 1000).toFixed(1)}s</b>
-        </div>
-    </div>
-    <pre id="json"></pre>
-    <script>
-        const rawJson = ${JSON.stringify(jsonStr)};
-        function syntaxHighlight(json) {
-            json = json.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-            return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\\s*:)?|\\b(true|false|null)\\b|-?\\d+(?:\\.\\d*)?(?:[eE][+\\-]?\\d+)?)/g, function (match) {
-                var cls = 'number';
-                if (/^"/.test(match)) {
-                    if (/:$/.test(match)) {
-                        cls = 'key';
-                    } else {
-                        cls = 'string';
-                        if (match.indexOf('http') === 1) {
-                            var cleanUrl = match.slice(1, -1);
-                            return '<span class="string">"<a href="' + cleanUrl + '" target="_blank" class="url-link">' + cleanUrl + '</a>"</span>';
-                        }
-                    }
-                } else if (/true|false/.test(match)) {
-                    cls = 'boolean';
-                } else if (/null/.test(match)) {
-                    cls = 'null';
-                }
-                return '<span class="' + cls + '">' + match + '</span>';
-            });
-        }
-        document.getElementById('json').innerHTML = syntaxHighlight(rawJson);
-    </script>
-</body>
-</html>`);
-    } else {
-        res.setHeader("Content-Type", "application/json; charset=utf-8");
-        return res.status(200).send(JSON.stringify(data, null, 2));
-    }
-}
-
 const app = express();
 
 app.use((req, res, next) => {
-    const originalJson = res.json.bind(res);
-    res.json = function (data) {
-        res.setHeader("Access-Control-Allow-Origin", "*");
-        const isBrowser = req.headers.accept && req.headers.accept.includes("text/html") && !req.query.raw;
-        if (isBrowser) {
-            res.setHeader("Content-Type", "text/html; charset=utf-8");
-            const jsonStr = JSON.stringify(data, null, 2);
-            return res.status(200).send(`<!DOCTYPE html>
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    const originalEnd = res.end.bind(res);
+    res.end = function (chunk, encoding) {
+        if (chunk) {
+            let strChunk = null;
+            if (typeof chunk === "string") strChunk = chunk;
+            else if (Buffer.isBuffer(chunk)) strChunk = chunk.toString("utf8");
+
+            if (strChunk) {
+                const contentType = res.getHeader("Content-Type") || "";
+                if (contentType.includes("application/json") || strChunk.trim().startsWith("{") || strChunk.trim().startsWith("[")) {
+                    try {
+                        const data = JSON.parse(strChunk);
+                        const isBrowser = req.headers.accept && req.headers.accept.includes("text/html") && !req.query.raw;
+                        if (isBrowser) {
+                            res.setHeader("Content-Type", "text/html; charset=utf-8");
+                            if (!res.headersSent) res.removeHeader("Content-Length");
+                            const jsonStr = JSON.stringify(data, null, 2);
+                            const totalItems = data.streams ? data.streams.length : (data.totalLinks || 0);
+                            const endpointName = req.originalUrl || req.url;
+                            return originalEnd(`<!DOCTYPE html>
 <html>
 <head>
-    <title>Nuvio Stream Extractor - ${req.url}</title>
+    <title>Nuvio Stream Extractor - ${endpointName}</title>
     <meta charset="utf-8">
     <style>
         body { background: #0f172a; color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace; padding: 25px; margin: 0; }
@@ -330,16 +272,16 @@ app.use((req, res, next) => {
     <div class="header">
         <h1>🎬 Nuvio Stream Extractor</h1>
         <div class="stats">
-            Endpoint: <b>${req.url}</b> &nbsp;|&nbsp; 
-            Total Items: <b>${data.streams ? data.streams.length : (data.totalLinks || 0)}</b>
+            Endpoint: <b>${endpointName}</b> &nbsp;|&nbsp; 
+            Total Items: <b>${totalItems}</b>
         </div>
     </div>
     <pre id="json"></pre>
     <script>
-        const rawJson = ${JSON.stringify(JSON.stringify(data, null, 2))};
+        const rawJson = ${JSON.stringify(jsonStr)};
         function syntaxHighlight(json) {
             json = json.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-            return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\\s*:)?|\\b(true|false|null)\\b|-?\\d+(?:\\.\\d*)?(?:[eE][+\\-]?\\d+)?)/g, function (match) {
+            return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\\\[^u]|[^\\\\"])*"(\\s*:)?|\\b(true|false|null)\\b|-?\\d+(?:\\.\\d*)?(?:[eE][+\\-]?\\d+)?)/g, function (match) {
                 var cls = 'number';
                 if (/^"/.test(match)) {
                     if (/:$/.test(match)) {
@@ -363,15 +305,24 @@ app.use((req, res, next) => {
     </script>
 </body>
 </html>`);
-        } else {
-            res.setHeader("Content-Type", "application/json; charset=utf-8");
-            return res.status(200).send(JSON.stringify(data, null, 2));
+                        } else {
+                            if (!res.headersSent) res.removeHeader("Content-Length");
+                            return originalEnd(JSON.stringify(data, null, 2), encoding);
+                        }
+                    } catch (e) {
+                        // pass through
+                    }
+                }
+            }
         }
+        return originalEnd(chunk, encoding);
     };
     next();
 });
 
-app.get("/api/extract", async (req, res) => {
+const extRouter = express.Router();
+
+extRouter.get("/extract", async (req, res) => {
     try {
         let id = req.query.id || req.query.imdbId;
         if (!id) return res.status(400).json({ status: "error", message: "Missing 'id' query parameter (e.g. ?id=tt0816692)" });
@@ -389,30 +340,44 @@ app.get("/api/extract", async (req, res) => {
         }
 
         const data = await runUniversalExtraction(id, type, season, episode);
-        return sendFormattedResponse(req, res, data);
+        return res.json(data);
     } catch (err) {
         return res.status(500).json({ status: "error", message: err.message });
     }
 });
 
-app.get("/extract/movie/:id", async (req, res) => {
+extRouter.get("/extract/:type/:id", async (req, res) => {
     try {
-        const data = await runUniversalExtraction(req.params.id, "movie", null, null);
-        return sendFormattedResponse(req, res, data);
+        let { type, id } = req.params;
+        let season = null;
+        let episode = null;
+
+        if (id.includes(":")) {
+            const parts = id.split(":");
+            id = parts[0];
+            if (parts.length > 1) season = parseInt(parts[1]);
+            if (parts.length > 2) episode = parseInt(parts[2]);
+        }
+
+        const data = await runUniversalExtraction(id, type, season, episode);
+        return res.json(data);
     } catch (err) {
         return res.status(500).json({ status: "error", message: err.message });
     }
 });
 
-app.get("/extract/series/:id/:season/:episode", async (req, res) => {
+extRouter.get("/extract/series/:id/:season/:episode", async (req, res) => {
     try {
         const data = await runUniversalExtraction(req.params.id, "series", parseInt(req.params.season), parseInt(req.params.episode));
-        return sendFormattedResponse(req, res, data);
+        return res.json(data);
     } catch (err) {
         return res.status(500).json({ status: "error", message: err.message });
     }
 });
 
+app.use("/.netlify/functions/api", extRouter);
+app.use("/api", extRouter);
+app.use("/", extRouter);
 app.use("/", getRouter(addon.getInterface()));
 
 module.exports = app;
