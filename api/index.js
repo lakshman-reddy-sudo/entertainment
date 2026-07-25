@@ -253,8 +253,8 @@ async function scrapeAllProviders(baseId, stType, season, episode) {
             if (!scraperModule || typeof scraperModule.getStreams !== "function") return { provider: scraperInfo.name, results: [] };
 
             try {
-                // Use 90s timeout for all environments since this is for personal JSON API usage
-                const timeoutMs = 90000;
+                // Use 240s (4 minutes) timeout for all environments to allow deep scrapers ample time
+                const timeoutMs = 240000;
                 const runScraper = async (idToUse) => {
                     try {
                         const res = await scraperModule.getStreams(idToUse, normalizedType, season, episode);
@@ -428,6 +428,128 @@ app.use((req, res, next) => {
     next();
 });
 
+function sendExtractedResponse(req, res, data) {
+    if (req.query.format === "json" || (req.headers.accept && req.headers.accept.includes("application/json") && !req.headers.accept.includes("text/html"))) {
+        return res.json(data);
+    }
+    if (req.headers.accept && req.headers.accept.includes("text/html") || req.query.view === "html" || req.query.format === "html") {
+        const jsonStr = JSON.stringify(data, null, 2);
+        const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Extract Results: ${data.query?.id || "Media"}</title>
+    <style>
+        :root { --bg: #0b0f19; --card: #131b2e; --text: #f1f5f9; --accent: #6366f1; --border: #222f4e; }
+        body { background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, sans-serif; margin: 0; padding: 2rem; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem; }
+        h1 { margin: 0; font-size: 1.5rem; color: #fff; }
+        .stats { display: flex; gap: 1.5rem; background: var(--card); padding: 0.8rem 1.2rem; border-radius: 8px; border: 1px solid var(--border); font-size: 0.9rem; flex-wrap: wrap; }
+        .stat-item b { color: #a5b4fc; }
+        .tabs { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+        .tab-btn { background: var(--card); border: 1px solid var(--border); color: #94a3b8; padding: 0.6rem 1.2rem; border-radius: 6px; cursor: pointer; font-weight: 600; transition: all 0.2s; }
+        .tab-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        pre { background: var(--card); padding: 1.5rem; border-radius: 8px; border: 1px solid var(--border); overflow-x: auto; color: #e2e8f0; font-size: 0.85rem; line-height: 1.5; }
+        table { width: 100%; border-collapse: collapse; background: var(--card); border-radius: 8px; overflow: hidden; border: 1px solid var(--border); }
+        th, td { padding: 0.8rem 1rem; text-align: left; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
+        th { background: rgba(99, 102, 241, 0.1); color: #a5b4fc; font-weight: 600; }
+        .badge { background: #334155; padding: 0.2rem 0.6rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600; display: inline-block; }
+        .btn { background: #4f46e5; color: #fff; border: none; padding: 0.4rem 0.8rem; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: 600; text-decoration: none; display: inline-block; }
+        .btn:hover { background: #4338ca; }
+        .btn-outline { background: transparent; border: 1px solid var(--border); color: #cbd5e1; }
+        .btn-outline:hover { background: rgba(255,255,255,0.05); }
+        .actions-cell { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+        .url-text { max-width: 280px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-family: monospace; font-size: 0.8rem; color: #94a3b8; }
+        @media (max-width: 768px) {
+            body { padding: 1rem; }
+            th, td { padding: 0.5rem; font-size: 0.8rem; }
+            .url-text { max-width: 120px; }
+            .stats { gap: 0.8rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div>
+                <h1>⚡ Nuvio Extractor: ${data.query?.id?.toUpperCase() || ""} (${data.query?.type || ""})</h1>
+                <p style="color: #64748b; margin: 0.4rem 0 0 0; font-size: 0.85rem;">Universal Multi-Provider Stream Scraping Engine</p>
+            </div>
+            <div style="display: flex; gap: 1rem; align-items: center;">
+                <a href="?format=json" class="btn btn-outline">📄 View Raw JSON API</a>
+            </div>
+        </div>
+        <div class="stats">
+            <div class="stat-item">Time Taken: <b>${((data.timeTakenMs || 0)/1000).toFixed(1)}s</b></div>
+            <div class="stat-item">Total Links: <b>${data.totalLinks || 0}</b></div>
+            <div class="stat-item">Active Providers: <b>${data.activeProviders || 0}</b></div>
+        </div>
+        <div class="tabs">
+            <button class="tab-btn active" onclick="showTab('table')">📋 Extracted Links (${data.totalLinks || 0})</button>
+            <button class="tab-btn" onclick="showTab('json')">{} Formatted JSON</button>
+        </div>
+        <div id="tab-table" class="tab-content active">
+            ${(data.streams && data.streams.length > 0) ? `
+            <div style="overflow-x: auto;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Provider</th>
+                        <th>Quality</th>
+                        <th>Title / Info</th>
+                        <th>Direct URL</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${data.streams.map((s) => `
+                    <tr>
+                        <td><span class="badge">${s.provider || "Unknown"}</span></td>
+                        <td><b>${s.quality || "Auto"}</b></td>
+                        <td style="max-width: 250px;">${s.title || "Stream"}</td>
+                        <td><div class="url-text" title="${s.directUrl || s.url || ""}">${s.directUrl || s.url || ""}</div></td>
+                        <td class="actions-cell">
+                            <button class="btn" onclick="copyText('${(s.directUrl || s.url || "").replace(/'/g, "\\'")}')">Copy Link</button>
+                            ${s.proxyUrl ? `<button class="btn btn-outline" onclick="copyText('${s.proxyUrl.replace(/'/g, "\\'")}')">Copy Proxy</button>` : ""}
+                            <a href="${s.directUrl || s.url || "#"}" target="_blank" class="btn btn-outline">Open</a>
+                        </td>
+                    </tr>`).join("")}
+                </tbody>
+            </table>
+            </div>` : `<div style="padding: 2rem; text-align: center; background: var(--card); border-radius: 8px;">No streams found for this query.</div>`}
+        </div>
+        <div id="tab-json" class="tab-content">
+            <div style="margin-bottom: 0.5rem; text-align: right;">
+                <button class="btn" onclick="copyJson()">Copy All JSON</button>
+            </div>
+            <pre id="json-pre">${jsonStr.replace(/&/g, "&amp;").replace(/</g, "&gt;").replace(/>/g, "&gt;")}</pre>
+        </div>
+    </div>
+    <script>
+        function showTab(tab) {
+            document.querySelectorAll('.tab-btn').forEach((b, i) => b.classList.toggle('active', (tab==='table' && i===0) || (tab==='json' && i===1)));
+            document.getElementById('tab-table').classList.toggle('active', tab === 'table');
+            document.getElementById('tab-json').classList.toggle('active', tab === 'json');
+        }
+        function copyText(val) {
+            navigator.clipboard.writeText(val).then(() => alert('Copied to clipboard!'));
+        }
+        function copyJson() {
+            const txt = document.getElementById('json-pre').innerText;
+            navigator.clipboard.writeText(txt).then(() => alert('JSON copied to clipboard!'));
+        }
+    </script>
+</body>
+</html>`;
+        return res.send(html);
+    }
+    return res.json(data);
+}
+
 const extRouter = express.Router();
 
 extRouter.get("/extract", async (req, res) => {
@@ -448,7 +570,7 @@ extRouter.get("/extract", async (req, res) => {
         }
 
         const data = await runUniversalExtraction(id, type, season, episode);
-        return res.json(data);
+        return sendExtractedResponse(req, res, data);
     } catch (err) {
         return res.status(500).json({ status: "error", message: err.message });
     }
@@ -468,7 +590,7 @@ extRouter.get("/extract/:type/:id", async (req, res) => {
         }
 
         const data = await runUniversalExtraction(id, type, season, episode);
-        return res.json(data);
+        return sendExtractedResponse(req, res, data);
     } catch (err) {
         return res.status(500).json({ status: "error", message: err.message });
     }
@@ -477,7 +599,7 @@ extRouter.get("/extract/:type/:id", async (req, res) => {
 extRouter.get("/extract/series/:id/:season/:episode", async (req, res) => {
     try {
         const data = await runUniversalExtraction(req.params.id, "series", parseInt(req.params.season), parseInt(req.params.episode));
-        return res.json(data);
+        return sendExtractedResponse(req, res, data);
     } catch (err) {
         return res.status(500).json({ status: "error", message: err.message });
     }
@@ -486,7 +608,7 @@ extRouter.get("/extract/series/:id/:season/:episode", async (req, res) => {
 extRouter.get("/extract/anime/:id/:season/:episode", async (req, res) => {
     try {
         const data = await runUniversalExtraction(req.params.id, "anime", parseInt(req.params.season), parseInt(req.params.episode));
-        return res.json(data);
+        return sendExtractedResponse(req, res, data);
     } catch (err) {
         return res.status(500).json({ status: "error", message: err.message });
     }

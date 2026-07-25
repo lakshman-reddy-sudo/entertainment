@@ -100,7 +100,13 @@ function triggerScrape(engineType) {
         return;
     }
 
-    executeExtraction(id, type, season, episode, engineType);
+    let url = `${currentBackendUrl}/extract/${type}/${encodeURIComponent(id)}`;
+    if (type === "series" || type === "anime") {
+        url = `${currentBackendUrl}/extract/${type}/${encodeURIComponent(id)}/${season}/${episode}`;
+    }
+
+    showToast(`🚀 Opening ${engineType === "render" ? "Render Primary" : "Netlify Backup"} API in a new tab...`);
+    window.open(url, "_blank");
 }
 window.triggerScrape = triggerScrape;
 
