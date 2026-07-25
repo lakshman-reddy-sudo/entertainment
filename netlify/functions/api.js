@@ -264,9 +264,21 @@ async function scrapeAllProviders(baseId, stType, season, episode) {
                     }
                 };
                 const resultsPromise = (async () => {
-                    const res1 = await runScraper(numericId);
-                    if (res1.length > 0 || numericId === baseId) return res1;
-                    return await runScraper(baseId);
+                    if (numericId === baseId) {
+                        return await runScraper(baseId);
+                    }
+                    const [res1, res2] = await Promise.all([
+                        runScraper(numericId),
+                        runScraper(baseId)
+                    ]);
+                    const combined = [...(Array.isArray(res1) ? res1 : []), ...(Array.isArray(res2) ? res2 : [])];
+                    const seen = new Set();
+                    return combined.filter(s => {
+                        if (!s || !s.url) return false;
+                        if (seen.has(s.url)) return false;
+                        seen.add(s.url);
+                        return true;
+                    });
                 })();
 
                 const results = await Promise.race([
@@ -440,6 +452,7 @@ function sendExtractedResponse(req, res, data) {
         return res.json(data);
     }
     if (req.headers.accept && req.headers.accept.includes("text/html") || req.query.view === "html" || req.query.format === "html") {
+        const streamList = data.streams || data.links || [];
         const jsonStr = JSON.stringify(data, null, 2);
         const html = `<!DOCTYPE html>
 <html lang="en">
@@ -500,7 +513,7 @@ function sendExtractedResponse(req, res, data) {
             <button class="tab-btn" onclick="showTab('json')">{} Formatted JSON</button>
         </div>
         <div id="tab-table" class="tab-content active">
-            ${(data.streams && data.streams.length > 0) ? `
+            ${(streamList && streamList.length > 0) ? `
             <div style="overflow-x: auto;">
             <table>
                 <thead>
@@ -513,7 +526,7 @@ function sendExtractedResponse(req, res, data) {
                     </tr>
                 </thead>
                 <tbody>
-                    ${data.streams.map((s) => `
+                    ${streamList.map((s) => `
                     <tr>
                         <td><span class="badge">${s.provider || "Unknown"}</span></td>
                         <td><b>${s.quality || "Auto"}</b></td>
