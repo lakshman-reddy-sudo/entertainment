@@ -397,6 +397,11 @@ const app = express();
 // Clean JSON formatting middleware - outputs pure, formatted JSON without HTML wrappers
 app.use((req, res, next) => {
     res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With");
+    if (req.method === "OPTIONS") {
+        return res.status(200).end();
+    }
     const originalEnd = res.end.bind(res);
     res.end = function (chunk, encoding) {
         if (chunk) {

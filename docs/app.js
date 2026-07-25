@@ -38,22 +38,16 @@ document.addEventListener("DOMContentLoaded", () => {
  * Backend Settings & Persistence
  */
 function initBackendSettings() {
-    const savedPreset = localStorage.getItem("nuvio_api_preset") || "render";
-    const savedCustomUrl = localStorage.getItem("nuvio_custom_url") || "";
-
-    const presetRadio = document.querySelector(`input[name="api-preset"][value="${savedPreset}"]`);
-    if (presetRadio) presetRadio.checked = true;
-
-    if (savedPreset === "custom" && savedCustomUrl) {
-        const customField = document.getElementById("custom-api-url");
-        if (customField) customField.value = savedCustomUrl;
-        const customGroup = document.getElementById("custom-url-group");
-        if (customGroup) customGroup.classList.remove("hidden");
-        currentBackendUrl = savedCustomUrl.replace(/\/$/, "");
-    } else {
-        currentBackendUrl = API_PRESETS[savedPreset] || API_PRESETS.render;
+    try {
+        const savedPreset = localStorage.getItem("nuvio_api_preset") || "render";
+        if (savedPreset === "netlify") {
+            currentBackendUrl = API_PRESETS.netlify;
+        } else {
+            currentBackendUrl = API_PRESETS.render;
+        }
+    } catch (e) {
+        currentBackendUrl = API_PRESETS.render;
     }
-
     updateStatusIndicator();
 }
 
@@ -83,18 +77,22 @@ function updateStatusIndicator() {
 function triggerScrape(engineType) {
     if (engineType === "render") {
         currentBackendUrl = API_PRESETS.render;
-        localStorage.setItem("nuvio_api_preset", "render");
+        try { localStorage.setItem("nuvio_api_preset", "render"); } catch(e){}
     } else if (engineType === "netlify") {
         currentBackendUrl = API_PRESETS.netlify;
-        localStorage.setItem("nuvio_api_preset", "netlify");
+        try { localStorage.setItem("nuvio_api_preset", "netlify"); } catch(e){}
     }
     updateStatusIndicator();
 
     const mediaIdInput = document.getElementById("media-id");
+    if (!mediaIdInput) return;
     const id = mediaIdInput.value.trim();
-    const type = document.querySelector('input[name="media-type"]:checked').value;
-    const season = document.getElementById("season-num").value || 1;
-    const episode = document.getElementById("episode-num").value || 1;
+    const checkedRadio = document.querySelector('input[name="media-type"]:checked');
+    const type = checkedRadio ? checkedRadio.value : "movie";
+    const seasonInput = document.getElementById("season-num");
+    const episodeInput = document.getElementById("episode-num");
+    const season = seasonInput ? seasonInput.value || 1 : 1;
+    const episode = episodeInput ? episodeInput.value || 1 : 1;
 
     if (!id) {
         showToast("⚠️ Please enter a valid IMDb or TMDB ID");
@@ -104,6 +102,7 @@ function triggerScrape(engineType) {
 
     executeExtraction(id, type, season, episode, engineType);
 }
+window.triggerScrape = triggerScrape;
 
 /**
  * Form & Input Controls
@@ -114,41 +113,63 @@ function setupFormControls() {
     const mediaIdInput = document.getElementById("media-id");
     const btnClearId = document.getElementById("btn-clear-id");
     const scrapeForm = document.getElementById("scrape-form");
+    const btnRender = document.getElementById("btn-submit-render");
+    const btnNetlify = document.getElementById("btn-submit-netlify");
+
+    if (btnRender) {
+        btnRender.addEventListener("click", (e) => {
+            e.preventDefault();
+            triggerScrape("render");
+        });
+    }
+    if (btnNetlify) {
+        btnNetlify.addEventListener("click", (e) => {
+            e.preventDefault();
+            triggerScrape("netlify");
+        });
+    }
 
     // Toggle season/episode inputs based on media type
     typeRadios.forEach(radio => {
         radio.addEventListener("change", (e) => {
             document.querySelectorAll(".type-option").forEach(el => el.classList.remove("active"));
-            e.target.closest(".type-option").classList.add("active");
-
-            if (e.target.value === "series" || e.target.value === "anime") {
-                episodeControls.classList.remove("hidden");
-            } else {
-                episodeControls.classList.add("hidden");
+            if (e.target.closest(".type-option")) {
+                e.target.closest(".type-option").classList.add("active");
+            }
+            if (episodeControls) {
+                if (e.target.value === "series" || e.target.value === "anime") {
+                    episodeControls.classList.remove("hidden");
+                } else {
+                    episodeControls.classList.add("hidden");
+                }
             }
         });
     });
 
     // Clear ID button
-    mediaIdInput.addEventListener("input", () => {
-        if (mediaIdInput.value.trim().length > 0) {
-            btnClearId.classList.remove("hidden");
-        } else {
-            btnClearId.classList.add("hidden");
-        }
-    });
+    if (mediaIdInput && btnClearId) {
+        mediaIdInput.addEventListener("input", () => {
+            if (mediaIdInput.value.trim().length > 0) {
+                btnClearId.classList.remove("hidden");
+            } else {
+                btnClearId.classList.add("hidden");
+            }
+        });
 
-    btnClearId.addEventListener("click", () => {
-        mediaIdInput.value = "";
-        btnClearId.classList.add("hidden");
-        mediaIdInput.focus();
-    });
+        btnClearId.addEventListener("click", () => {
+            mediaIdInput.value = "";
+            btnClearId.classList.add("hidden");
+            mediaIdInput.focus();
+        });
+    }
 
     // Form Submission fallback (Enter key defaults to Render Primary)
-    scrapeForm.addEventListener("submit", (e) => {
-        e.preventDefault();
-        triggerScrape("render");
-    });
+    if (scrapeForm) {
+        scrapeForm.addEventListener("submit", (e) => {
+            e.preventDefault();
+            triggerScrape("render");
+        });
+    }
 }
 
 /**
@@ -577,52 +598,16 @@ function setupQuickChips() {
  */
 function setupModalControls() {
     // Player modal close
-    document.getElementById("btn-close-player").addEventListener("click", closePlayerModal);
-    document.getElementById("video-modal").addEventListener("click", (e) => {
-        if (e.target.id === "video-modal") closePlayerModal();
-    });
-
-    // Settings modal open/close
-    document.getElementById("btn-settings").addEventListener("click", () => {
-        document.getElementById("settings-modal").classList.remove("hidden");
-    });
-    document.getElementById("btn-close-settings").addEventListener("click", () => {
-        document.getElementById("settings-modal").classList.add("hidden");
-    });
-
-    // Custom API URL toggle in settings
-    const presetRadios = document.querySelectorAll('input[name="api-preset"]');
-    presetRadios.forEach(radio => {
-        radio.addEventListener("change", (e) => {
-            if (e.target.value === "custom") {
-                document.getElementById("custom-url-group").classList.remove("hidden");
-            } else {
-                document.getElementById("custom-url-group").classList.add("hidden");
-            }
+    const btnClosePlayer = document.getElementById("btn-close-player");
+    if (btnClosePlayer) {
+        btnClosePlayer.addEventListener("click", closePlayerModal);
+    }
+    const videoModal = document.getElementById("video-modal");
+    if (videoModal) {
+        videoModal.addEventListener("click", (e) => {
+            if (e.target.id === "video-modal") closePlayerModal();
         });
-    });
-
-    // Save Settings
-    document.getElementById("btn-save-settings").addEventListener("click", () => {
-        const selectedPreset = document.querySelector('input[name="api-preset"]:checked').value;
-        localStorage.setItem("nuvio_api_preset", selectedPreset);
-
-        if (selectedPreset === "custom") {
-            const customVal = document.getElementById("custom-api-url").value.trim();
-            if (!customVal) {
-                showToast("⚠️ Please specify a valid custom API URL");
-                return;
-            }
-            localStorage.setItem("nuvio_custom_url", customVal);
-            currentBackendUrl = customVal.replace(/\/$/, "");
-        } else {
-            currentBackendUrl = API_PRESETS[selectedPreset] || API_PRESETS.render;
-        }
-
-        updateStatusIndicator();
-        document.getElementById("settings-modal").classList.add("hidden");
-        showToast("⚙️ API backend endpoint updated successfully!");
-    });
+    }
 }
 
 function openPlayerModal(index) {

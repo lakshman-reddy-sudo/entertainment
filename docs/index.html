@@ -41,9 +41,6 @@
                     <span class="status-dot"></span>
                     <span class="status-label" id="backend-status-text">Connected</span>
                 </div>
-                <button id="btn-settings" class="btn-icon tooltip" data-tooltip="API Settings">
-                    <i data-lucide="settings"></i>
-                </button>
             </div>
         </div>
     </header>
@@ -296,66 +293,6 @@
             <div class="modal-footer">
                 <span class="player-meta" id="player-meta-info">HLS / MP4 Stream</span>
                 <button type="button" class="btn-secondary" id="btn-copy-player-url">Copy Stream URL</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Settings Modal -->
-    <div id="settings-modal" class="modal-overlay hidden">
-        <div class="modal-card glass-panel">
-            <div class="modal-header">
-                <div class="modal-title">
-                    <i data-lucide="sliders"></i>
-                    <span>Backend API Configuration</span>
-                </div>
-                <button type="button" class="btn-close-modal" id="btn-close-settings">
-                    <i data-lucide="x"></i>
-                </button>
-            </div>
-            <div class="modal-body">
-                <p class="settings-desc">Select which backend instance executes the 61 provider scrapers and proxy interception.</p>
-                
-                <div class="settings-group">
-                    <label class="settings-label">Backend Instance URL</label>
-                    <div class="api-preset-options">
-                        <label class="preset-radio">
-                            <input type="radio" name="api-preset" value="render" checked>
-                            <span class="preset-card">
-                                <strong>☁️ Render Cloud</strong>
-                                <small>nuvio-stremio-addon.onrender.com</small>
-                            </span>
-                        </label>
-                        <label class="preset-radio">
-                            <input type="radio" name="api-preset" value="netlify">
-                            <span class="preset-card">
-                                <strong>⚡ Netlify Functions</strong>
-                                <small>nuvio-stremio-addon.netlify.app</small>
-                            </span>
-                        </label>
-                        <label class="preset-radio">
-                            <input type="radio" name="api-preset" value="local">
-                            <span class="preset-card">
-                                <strong>💻 Localhost (Dev)</strong>
-                                <small>http://localhost:3000</small>
-                            </span>
-                        </label>
-                        <label class="preset-radio">
-                            <input type="radio" name="api-preset" value="custom">
-                            <span class="preset-card">
-                                <strong>🔧 Custom URL</strong>
-                                <small>Specify your own endpoint</small>
-                            </span>
-                        </label>
-                    </div>
-
-                    <div id="custom-url-group" class="input-group mt-3 hidden">
-                        <label for="custom-api-url" class="input-label">Custom API Base URL</label>
-                        <input type="url" id="custom-api-url" placeholder="https://your-custom-backend.com">
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer flex-right">
-                <button type="button" class="btn-primary" id="btn-save-settings">Save & Apply</button>
             </div>
         </div>
     </div>
