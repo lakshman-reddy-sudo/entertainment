@@ -32,7 +32,7 @@ async function resolveTmdbId(imdbId) {
     if (tmdbIdCache[imdbId]) return tmdbIdCache[imdbId];
     try {
         const findUrl = `https://api.tmdb.org/3/find/${imdbId}?api_key=${TMDB_API_KEY}&external_source=imdb_id`;
-        const res = await global.fetch(findUrl);
+        const res = await global.fetch(findUrl, { signal: AbortSignal.timeout(4000) });
         if (res.ok) {
             const data = await res.json();
             let numericId = null;
@@ -253,8 +253,8 @@ async function scrapeAllProviders(baseId, stType, season, episode) {
             if (!scraperModule || typeof scraperModule.getStreams !== "function") return { provider: scraperInfo.name, results: [] };
 
             try {
-                // Use 240s (4 minutes) timeout for all environments to allow deep scrapers ample time
-                const timeoutMs = 240000;
+                // Use 22s timeout on Netlify serverless functions to prevent AWS Lambda 30s hard kill
+                const timeoutMs = 22000;
                 const runScraper = async (idToUse) => {
                     try {
                         const res = await scraperModule.getStreams(idToUse, normalizedType, season, episode);
@@ -296,7 +296,14 @@ async function scrapeAllProviders(baseId, stType, season, episode) {
         }
     }
 
-    const settled = await Promise.allSettled(poolResults);
+    const settled = await Promise.race([
+        Promise.allSettled(poolResults),
+        new Promise(resolve => setTimeout(async () => {
+            console.warn("[Extractor] Netlify 24s safety limit reached, resolving completed providers");
+            const currentRes = await Promise.all(poolResults.map(p => Promise.race([p, Promise.resolve(null)])));
+            resolve(currentRes.map(v => ({ status: v ? "fulfilled" : "rejected", value: v })));
+        }, 24000))
+    ]);
     const providerData = [];
     settled.forEach(res => {
         if (res.status === "fulfilled" && res.value) {
