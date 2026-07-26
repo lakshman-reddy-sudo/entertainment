@@ -253,8 +253,8 @@ async function scrapeAllProviders(baseId, stType, season, episode) {
             if (!scraperModule || typeof scraperModule.getStreams !== "function") return { provider: scraperInfo.name, results: [] };
 
             try {
-                // Use 240s (4 minutes) timeout for all environments to allow deep scrapers ample time
-                const timeoutMs = 240000;
+                // Use 300s (5 minutes) safety ceiling to remove premature cutoffs while protecting against dead sites
+                const timeoutMs = 300000;
                 const runScraper = async (idToUse) => {
                     try {
                         const res = await scraperModule.getStreams(idToUse, normalizedType, season, episode);

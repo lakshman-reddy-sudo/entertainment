@@ -31,6 +31,16 @@ An all-in-one open-source **High-Performance Stream Extraction Engine**, featuri
 
 ---
 
+## 🏛️ Core Architecture Decisions (Permanent Foundation)
+
+> **IMPORTANT NOTICE FOR FUTURE DEVELOPERS & AI AGENTS:**
+> **Going forward, we will keep this parallel, full-yield scraping architecture as the permanent foundation! Do NOT revert or modify these principles:**
+
+1. **⚡ Parallel ID Scraping & Deduplication**: All 61 scrapers must query both IMDb ID and TMDB ID simultaneously using `Promise.all([runScraper(numericId), runScraper(baseId)])`. Results are merged and deduplicated by URL. Never implement sequential ID fallback, as providers frequently index resolutions and alternative servers across both ID systems.
+2. **🛡️ Full-Yield Execution (No Premature Timeouts)**: We do not clip or prematurely cut off scrapers with short 20s/30s timeouts. We allow all providers up to a 5-minute (`300000ms`) safety ceiling to complete multi-page scraping, link-shortener bypassing, and direct stream resolution on Render containers.
+
+---
+
 ## ⚡ Hosting Your Own Cloudflare HLS Proxy
 
 Want to host your own private Edge proxy for streaming without CORS or Referer issues? We made our Cloudflare Worker proxy 100% open source!
