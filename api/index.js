@@ -32,7 +32,7 @@ async function resolveTmdbId(imdbId) {
     if (tmdbIdCache[imdbId]) return tmdbIdCache[imdbId];
     try {
         const findUrl = `https://api.tmdb.org/3/find/${imdbId}?api_key=${TMDB_API_KEY}&external_source=imdb_id`;
-        const res = await global.fetch(findUrl);
+        const res = await global.fetch(findUrl, { signal: AbortSignal.timeout(4000) });
         if (res.ok) {
             const data = await res.json();
             let numericId = null;

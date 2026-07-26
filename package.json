@@ -2,9 +2,9 @@
   "name": "nuvio-stremio-addon",
   "version": "1.0.0",
   "description": "Nuvio Stremio Addon Engine",
-  "main": "netlify/functions/api.js",
+  "main": "api/index.js",
   "scripts": {
-    "start": "node netlify/functions/api.js"
+    "start": "node api/index.js"
   },
   "dependencies": {
     "axios": "^1.6.0",
