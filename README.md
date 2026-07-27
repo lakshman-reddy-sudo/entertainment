@@ -1,4 +1,4 @@
-# 🎬 Nuvio & Entertainment Stream Extraction Suite
+# 🎬 Nuvio & Entertainment Stream Extraction Suite for all
 
 [![GitHub Pages](https://img.shields.io/badge/GitHub%20Pages-Live%20UI-38bdf8?style=for-the-badge&logo=github)](https://lakshman-reddo-sudo.github.io/entertainment/)
 [![Render API](https://img.shields.io/badge/Render-Primary%20API-4f46e5?style=for-the-badge&logo=render)](https://nuvio-stremio-addon.onrender.com)
